@@ -1,3 +1,4 @@
+package repositories
 // Package repositories provides cached repository implementations for persistent data storage.
 package repositories
 
@@ -204,3 +205,4 @@ func (r *CachedAPIKeyRepository) saveToFile(keys []types.APIKey) error {
 	config := types.APIKeysConfig{Keys: keys}
 	return types.SaveAPIKeysToFile(config, r.filePath)
 }
+

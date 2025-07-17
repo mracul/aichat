@@ -1,3 +1,4 @@
+package chat
 // layout.go
 // Responsive layout computation for CompositeChatViewState
 
@@ -9,3 +10,4 @@ func ComputeLayout(termWidth, termHeight int) LayoutState {
 	// TODO: Implement responsive layout logic
 	return LayoutState{}
 }
+

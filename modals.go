@@ -1,7 +1,7 @@
+package main
+
 // modals.go - Contains reusable modal components for the TUI application.
 // Centralizes Lipgloss style definitions for consistency and maintainability.
-
-package main
 
 import (
 	"regexp"

@@ -1,3 +1,4 @@
+package menu
 // ascii_art.go: Provides the AsciiArtView component for menu rendering.
 
 package menu
@@ -12,3 +13,4 @@ func AsciiArtView() string {
  ██║  ██║██║╚██████╗██║  ██║██║  ██║   ██║   
  ╚═╝  ╚═╝╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   `
 }
+

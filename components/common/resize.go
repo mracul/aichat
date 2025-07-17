@@ -1,3 +1,4 @@
+package common
 // Package common provides shared utilities and components for the AI CLI application.
 package common
 
@@ -444,3 +445,4 @@ func (rm *ResizeMonitor) GetStats() ResizeStats {
 	defer rm.mutex.RUnlock()
 	return rm.stats
 }
+

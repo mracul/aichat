@@ -1,3 +1,4 @@
+package flows
 // favorites.go
 // Type definitions for favorites-related flows (add, remove, list, reorder)
 
@@ -33,3 +34,4 @@ type ReorderFavoritesFlow struct {
 	NoticeModal types.ViewState
 	Strategy    FlowStrategy
 }
+

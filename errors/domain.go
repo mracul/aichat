@@ -1,3 +1,4 @@
+package errors
 // =====================================================================================
 // 🧠 Domain Error Handling Flow – Unified, Animated, and User-Centric
 // =====================================================================================
@@ -314,15 +315,19 @@ type ErrorModal struct {
 	Height      int
 	ShowDetails bool
 	Quitting    bool
+	Config      interface{} // Add config for theming
 }
 
-func NewErrorModal(err *DomainError) *ErrorModal {
+// Move import inside function to avoid import cycle
+func NewErrorModal(err *DomainError, config interface{}) *ErrorModal {
+	type ModalRenderConfig = interface{} // Use interface{} as a placeholder for ModalRenderConfig
 	return &ErrorModal{
 		Error:   err,
 		Title:   "Error",
 		Content: err.UserMsg,
 		Width:   60,
 		Height:  10,
+		Config:  config,
 	}
 }
 
@@ -479,3 +484,4 @@ func getSpinner(index int) string {
 	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	return spinners[index%len(spinners)]
 }
+

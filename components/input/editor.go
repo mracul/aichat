@@ -1,26 +1,30 @@
+package input
 // editor.go - Defines the EditorModal for displaying a message in a read-only editor with cursor and selection support.
 // Used for viewing and copying chat messages in a modal overlay.
 
 package input
 
 import (
+	"aichat/components/modals"
+
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // EditorModal displays a message in a read-only editor with cursor and selection support.
 type EditorModal struct {
-	Content     string // The message content to display
-	Cursor      int    // Cursor position
-	SelectStart int    // Selection start index, -1 if no selection
-	SelectEnd   int    // Selection end index, -1 if no selection
-	Focused     bool   // Whether the editor is focused
-	Quitting    bool   // Whether the modal is quitting
-	Message     string // Optional info/error message
+	Content     string                   // The message content to display
+	Cursor      int                      // Cursor position
+	SelectStart int                      // Selection start index, -1 if no selection
+	SelectEnd   int                      // Selection end index, -1 if no selection
+	Focused     bool                     // Whether the editor is focused
+	Quitting    bool                     // Whether the modal is quitting
+	Message     string                   // Optional info/error message
+	Config      modals.ModalRenderConfig // Add config for theming
 }
 
 // NewEditorModal creates a new EditorModal with the given content.
-func NewEditorModal(content string) *EditorModal {
+func NewEditorModal(content string, config modals.ModalRenderConfig) *EditorModal {
 	return &EditorModal{
 		Content:     content,
 		Cursor:      0,
@@ -28,6 +32,7 @@ func NewEditorModal(content string) *EditorModal {
 		SelectEnd:   -1,
 		Focused:     true,
 		Quitting:    false,
+		Config:      config,
 	}
 }
 
@@ -97,3 +102,4 @@ func (m *EditorModal) View() string {
 	}
 	return "[Read-Only Message Editor]\n" + content + "\n" + m.Message + "\n(Esc to close, Ctrl+C/X to copy, Ctrl+I to focus input)"
 }
+

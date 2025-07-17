@@ -1,3 +1,4 @@
+package flows
 // global.go
 // Type definitions for global flows (confirmation, input, selection, error/info)
 
@@ -31,3 +32,4 @@ type ErrorInfoFlow struct {
 	NoticeModal types.ViewState
 	Strategy    FlowStrategy
 }
+

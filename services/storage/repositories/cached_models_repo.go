@@ -1,3 +1,4 @@
+package repositories
 // Package repositories provides cached repository implementations for persistent data storage.
 package repositories
 
@@ -177,3 +178,4 @@ func (r *CachedModelRepository) GetStats() map[string]cache.CacheStats {
 func (r *CachedModelRepository) saveToFile(modelList []types.Model) error {
 	return types.SaveModelsToFile(modelList, r.filePath)
 }
+

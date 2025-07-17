@@ -1,3 +1,4 @@
+package flows
 // chats.go
 // Type definitions for chat-related flows (new, custom, load, delete, list, export, rename)
 
@@ -74,3 +75,4 @@ type ChatInfo struct {
 	LastUpdated int64
 	IsFavorite  bool
 }
+

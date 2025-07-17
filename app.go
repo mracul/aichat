@@ -1,24 +1,30 @@
+package main
+
 // app.go - Unified AI CLI Application (single mode, single model)
 // This file now only contains the unified UnifiedAppModel and related logic.
-
-package main
 
 import (
 	"aichat/components/chat"
 	"aichat/components/common"
+	"aichat/components/input"
+	"aichat/components/menus"
 	"aichat/components/modals"
 	"aichat/components/modals/dialogs"
 	"aichat/components/sidebar"
+	"aichat/flows"
+	"aichat/models"
+	"aichat/navigation"
 	"aichat/services/cache"
 	"aichat/services/storage"
-	"aichat/state"
 	"aichat/types"
+	"aichat/types/render"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -60,16 +66,21 @@ type UnifiedAppModel struct {
 	logger *slog.Logger
 
 	// Navigation and state management (following project structure)
-	navStack *state.NavigationStack
+	navStack *navigation.NavigationStack
 	storage  storage.NavigationStorage
 
 	// UI Components (using existing responsive/optimized components)
 	sidebar  *sidebar.SidebarTabsModel
-	chatView *chat.ChatViewState
+	chatView *chat.CompositeChatViewState
 
 	// Modal system (using existing modal components)
 	modalManager *modals.ModalManager
 	modalActive  bool
+
+	// New menu MVC
+	menuModel      *menus.MenuModel
+	menuView       *menus.MenuView
+	menuController *menus.MenuController
 
 	// Layout state
 	width  int
@@ -90,52 +101,44 @@ type UnifiedAppModel struct {
 	shouldQuit bool
 }
 
-// NewUnifiedAppModel creates a new unified application model
 func NewUnifiedAppModel(config *AppConfig, storage storage.NavigationStorage, logger *slog.Logger) *UnifiedAppModel {
-	// Create app first so we can reference it in context
+	// Create the UnifiedAppModel instance first (so you can reference it in the controller)
 	app := &UnifiedAppModel{
-		config:      config,
-		logger:      logger,
-		storage:     storage,
-		modalActive: false,
-		width:       config.DefaultWidth,
-		height:      config.DefaultHeight,
-		style:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")),
-		renderCount: 0,
-		lastRender:  time.Now(),
-		focus:       "navigation",
-		isRunning:   true,
-		helpShown:   false,
-		showStats:   false,
-		shouldQuit:  false,
+		config:       config,
+		logger:       logger,
+		storage:      storage,
+		modalActive:  false,
+		width:        config.DefaultWidth,
+		height:       config.DefaultHeight,
+		style:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")),
+		renderCount:  0,
+		lastRender:   time.Now(),
+		focus:        "navigation",
+		isRunning:    true,
+		helpShown:    false,
+		showStats:    false,
+		shouldQuit:   false,
+		modalManager: modals.NewModalManagerFactory(), // <-- Ensure modalManager is initialized
 	}
 
-	// Create context and navigation for menu actions
-	ctx := &appContext{app: app}
+	// Create navigation controller
 	nav := &appNavigation{app: app}
 
-	// Create main menu using proper ViewState interface with context and navigation
-	mainMenu := types.NewMenuViewState(types.MainMenu, types.MainMenuEntries, "Main Menu", ctx, nav)
+	// Create the main menu view state, passing nav as the controller
+	mainMenu := types.NewMenuViewState(
+		types.MainMenu,
+		types.GetMenuEntries(types.MainMenu),
+		"Main Menu",
+		nil, // ctx (set if you have a context)
+		nav, // nav controller
+	)
 
-	// Create sidebar (using existing responsive component)
-	sidebar := sidebar.NewSidebarTabsModel([]string{"Chats"})
+	// Create the navigation stack with main menu as root
+	stack := navigation.NewNavigationStack(mainMenu)
+	app.navStack = stack
 
-	// Create chat view based on mode (using existing optimized/responsive components)
-	chatView := chat.NewChatViewState("Welcome", nil)
-
-	// Create modal manager (using existing modal component)
-	modalManager := &modals.ModalManager{}
-
-	// Set the navigation stack and components
-	app.navStack = state.NewNavigationStack(mainMenu)
-	app.sidebar = sidebar
-	app.chatView = chatView
-	app.modalManager = modalManager
-
-	// Set initial dimensions on the main menu
-	if mainMenu != nil {
-		mainMenu.Resize(config.DefaultWidth, config.DefaultHeight)
-	}
+	// If you need to set Nav after stack creation (rare), do:
+	// mainMenu.Nav = nav
 
 	return app
 }
@@ -156,36 +159,66 @@ type appNavigation struct {
 	app *UnifiedAppModel
 }
 
-func (nav *appNavigation) Push(view types.ViewState) {
-	nav.app.navStack.Push(view)
+// Update appNavigation to implement interfaces.Controller with interface{} for view arguments/returns
+func (nav *appNavigation) Push(view interface{}) {
+	if v, ok := view.(types.ViewState); ok {
+		nav.app.navStack.Push(v)
+	}
 }
 
-func (nav *appNavigation) Pop() types.ViewState {
+func (nav *appNavigation) Pop() interface{} {
 	return nav.app.navStack.Pop()
 }
 
-func (nav *appNavigation) Replace(view types.ViewState) {
-	nav.app.navStack.ReplaceTop(view)
+func (nav *appNavigation) Replace(view interface{}) {
+	if v, ok := view.(types.ViewState); ok {
+		nav.app.navStack.ReplaceTop(v)
+	}
 }
 
-func (nav *appNavigation) ShowModal(modalType types.ModalType, data interface{}) {
-	// TODO: Implement modal showing
-	nav.app.logger.Info("Show modal", "modalType", modalType)
+// Update ShowModal to match interfaces.Controller
+func (nav *appNavigation) ShowModal(modalType string, data interface{}) {
+	if modal, ok := data.(types.ViewState); ok {
+		nav.app.modalManager.Push(modal)
+		nav.app.modalActive = true
+		return
+	}
+	// If data is a string, wrap it in a ModalViewState
+	if content, ok := data.(string); ok {
+		modal := &types.ModalViewState{
+			ModalType: modalType,
+			Content:   content,
+		}
+		nav.app.modalManager.Push(modal)
+		nav.app.modalActive = true
+	}
 }
 
 func (nav *appNavigation) HideModal() {
-	// TODO: Implement modal hiding
-	nav.app.logger.Info("Hide modal")
+	// Hide the top modal and update modalActive
+	nav.app.modalManager.Pop()
+	if nav.app.modalManager.Current() == nil {
+		nav.app.modalActive = false
+	}
 }
 
-func (nav *appNavigation) Current() types.ViewState {
+func (nav *appNavigation) Current() interface{} {
 	return nav.app.navStack.Top()
 }
 
 func (nav *appNavigation) CanPop() bool {
-	// Check if we can pop by seeing if there's more than one item in the stack
-	// The main menu is always at the bottom, so we can pop if there are 2+ items
 	return nav.app.navStack.Top() != nil && !nav.app.navStack.Top().IsMainMenu()
+}
+
+// Implement HandleExit on appNavigation to call flows.FlowExitMenu(nav)
+func (nav *appNavigation) HandleExit() {
+	flows.FlowExitMenu(nav)
+}
+
+// Implement QuitApp on appNavigation to send a QuitAppMsg to the Bubble Tea program
+func (nav *appNavigation) QuitApp() {
+	// Send a QuitAppMsg to the Bubble Tea program
+	nav.app.shouldQuit = true
 }
 
 // =====================================================================================
@@ -197,7 +230,7 @@ func (m *UnifiedAppModel) Init() tea.Cmd {
 	// Load navigation state
 	if m.storage != nil {
 		if data, err := m.storage.LoadNavigationState(); err == nil && len(data) > 0 {
-			_ = m.navStack.DeserializeStack(data)
+			// _ = m.navStack.DeserializeStack(data) // Not implemented in navigation.NavigationStack
 		}
 	}
 
@@ -225,9 +258,61 @@ func (m *UnifiedAppModel) Init() tea.Cmd {
 func (m *UnifiedAppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.renderCount++
 
+	// Debug logging for message and shouldQuit
+	if m.logger != nil {
+		m.logger.Info("Update called", "msg", fmt.Sprintf("%T", msg), "shouldQuit", m.shouldQuit)
+	}
+
+	if m.shouldQuit {
+		return m, tea.Quit
+	}
+
+	// Intercept menu navigation for Themes
+	top := m.navStack.Top()
+	if menu, ok := top.(*types.MenuViewState); ok && menu.MenuType() == types.SettingsMenu {
+		if msg, ok := msg.(tea.KeyMsg); ok && (msg.String() == "enter" || msg.String() == " ") {
+			entry := menu.Entries()[menu.Cursor()]
+			if entry.Text == "Themes" {
+				ctx := &appContext{app: m}
+				nav := &appNavigation{app: m}
+				m.navStack.Push(types.NewMenuViewState(types.ThemesMenu, types.GetMenuEntries(types.ThemesMenu), "Themes", ctx, nav))
+				return m, nil
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		return m.handleKeyPress(msg)
+		switch msg.String() {
+		case "q":
+			return m, tea.Quit
+		case "ctrl+c":
+			top := m.navStack.Top()
+			if _, ok := top.(*types.MenuViewState); ok {
+				// Main menu or submenu: show exit confirmation
+				fmt.Println("Exit confirmation triggered (main menu or submenu)")
+				// Example: m.showQuitConfirmationModal()
+				return m, nil
+			}
+			if _, ok := top.(*types.ChatViewState); ok {
+				// Chat view: copy (placeholder)
+				fmt.Println("Copy triggered in chat view")
+				return m, nil
+			}
+			if _, ok := top.(*types.ModalViewState); ok {
+				// Input prompt: copy (placeholder)
+				fmt.Println("Copy triggered in input prompt")
+				return m, nil
+			}
+			// Default: quit (for now)
+			return m, tea.Quit
+		case "up", "k":
+			// (Menu navigation logic removed: no cursor in main menu)
+		case "down", "j":
+			// (Menu navigation logic removed: no cursor in main menu)
+		case "enter":
+			// (Menu selection logic removed: no cursor in main menu)
+		}
 	case tea.WindowSizeMsg:
 		m.OnResize(msg.Width, msg.Height)
 		return m, nil
@@ -249,7 +334,7 @@ func (m *UnifiedAppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Update child components (using existing components)
 	m.sidebar.Update(msg)
-	m.chatView.Update(msg)
+	// m.chatView.Update(msg) // No Update method on CompositeChatViewState
 
 	// Update modal if active (using existing modal component)
 	if m.modalActive {
@@ -266,32 +351,28 @@ func (m *UnifiedAppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// m.monitor.RecordRender(false, float64(latency))
 	}
 
-	if m.shouldQuit {
-		return m, tea.Quit
-	}
+	// if m.shouldQuit {
+	// 	return m, tea.Quit
+	// }
 
 	return m, nil
 }
 
 // View renders the application
 func (m *UnifiedAppModel) View() string {
-	// If the top of the stack is the main menu, render only the main menu
+	ctx := &appContext{app: m}
+	if m.focus == "menu" {
+		return m.menuView.Render(m.menuModel)
+	}
+	// If the top of the stack is the main menu, render only the main menu with controls
 	top := m.navStack.Top()
 	if menu, ok := top.(*types.MenuViewState); ok && menu.IsMainMenu() {
-		return menu.View()
+		return input.RenderViewWithControls(menu, ctx)
 	}
 
 	if m.width < m.config.MinWidth || m.height < m.config.MinHeight {
 		return m.renderMinimalView()
 	}
-
-	// Get layout dimensions (using existing responsive layout)
-	// Remove all references to m.layout (lines 252–255, 492)
-	// Remove or comment out code like:
-	// headerWidth, _ := m.layout.GetHeaderDimensions()
-	// sidebarWidth, sidebarHeight := m.layout.GetSidebarDimensions()
-	// contentWidth, contentHeight := m.layout.GetContentDimensions()
-	// footerWidth, _ := m.layout.GetFooterDimensions()
 
 	// Render sections
 	header := m.renderHeader(m.width)
@@ -299,7 +380,6 @@ func (m *UnifiedAppModel) View() string {
 	content := m.renderContent(m.width, m.height)
 	footer := m.renderFooter(m.width)
 
-	// Combine sections
 	mainContent := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		sidebar,
@@ -307,18 +387,13 @@ func (m *UnifiedAppModel) View() string {
 		content,
 	)
 
-	// Apply modal overlay if active (using existing modal component)
 	if m.modalActive {
 		mainContent = m.renderModalOverlay(mainContent, m.width, m.height)
 	}
 
-	// Combine all sections
 	view := fmt.Sprintf("%s\n%s\n%s", header, mainContent, footer)
-
-	// Apply container style
 	styledView := m.style.Width(m.width).Height(m.height).Render(view)
 
-	// Apply ANSI optimization for optimized mode (using existing optimizer)
 	if m.config.EnableCaching {
 		return styledView
 	}
@@ -359,7 +434,8 @@ func (m *UnifiedAppModel) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global keys
 	switch keyStr {
 	case "ctrl+c", "q":
-		m.showQuitConfirmationModal()
+		nav := &appNavigation{app: m}
+		flows.FlowExitMenu(nav)
 		return m, nil
 	case "tab":
 		m.cycleFocus()
@@ -402,19 +478,18 @@ func (m *UnifiedAppModel) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleModalKeyPress handles keyboard input when a modal is active
 func (m *UnifiedAppModel) handleModalKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
-	keyStr := key.String()
-
-	switch keyStr {
-	case "esc":
-		return m, m.closeModal()
-	case "enter":
-		return m, m.handleModalEnter()
-	case "up", "k":
-		return m, m.handleModalUp()
-	case "down", "j":
-		return m, m.handleModalDown()
+	if m.modalActive {
+		current := m.modalManager.Current()
+		if current != nil {
+			newModel, cmd := current.Update(key)
+			if newModel != current {
+				// Replace the top modal with the new model
+				m.modalManager.Pop()
+				m.modalManager.Push(newModel.(types.ViewState))
+			}
+			return m, cmd
+		}
 	}
-
 	return m, nil
 }
 
@@ -431,9 +506,7 @@ func (m *UnifiedAppModel) showMainMenu() tea.Cmd {
 
 		mainMenu := types.NewMenuViewState(types.MainMenu, types.MainMenuEntries, "Main Menu", ctx, nav)
 		// Set dimensions on the new main menu
-		if mainMenu != nil {
-			mainMenu.Resize(m.width, m.height)
-		}
+		// mainMenu.Resize(m.width, m.height) // Removed: MenuViewState does not have Resize method
 		m.navStack.ReplaceTop(mainMenu)
 		m.focus = "menu" // Set focus to menu when showing main menu
 		return nil
@@ -501,10 +574,15 @@ func (m *UnifiedAppModel) showQuitConfirmationModal() {
 		Label:    "No",
 		OnSelect: func() { m.focus = "menu" },
 	}
+	modalConfig := modals.ModalRenderConfig{
+		ThemeMap:   make(render.ThemeMap),                  // TODO: convert DefaultThemeMap to ThemeMap if needed
+		Strategies: make(map[string]render.RenderStrategy), // TODO: convert DefaultRenderStrategies to map[string]render.RenderStrategy if needed
+	}
 	modal := dialogs.NewConfirmationModal(
 		"Are you sure you want to quit?",
 		[]modals.ModalOption{yesOption, noOption},
 		func() { m.focus = "menu" },
+		modalConfig,
 	)
 	m.modalManager.Push(modal)
 	m.modalActive = true
@@ -534,6 +612,7 @@ func (m *UnifiedAppModel) cycleFocus() {
 
 // OnResize handles terminal resize events
 func (m *UnifiedAppModel) OnResize(width, height int) {
+	fmt.Printf("UnifiedAppModel.OnResize called with width=%d height=%d\n", width, height)
 	m.width = width
 	m.height = height
 
@@ -740,21 +819,21 @@ func (m *UnifiedAppModel) LoadSampleData() {
 	// m.sidebar.SetChats(chats)
 
 	// Sample messages
-	messages := []types.Message{
-		{Role: "user", Content: "Hello, how can you help me today?", MessageNumber: 1},
-		{Role: "assistant", Content: "I'm here to help! I can assist with coding, answer questions, and much more.", MessageNumber: 2},
-		{Role: "user", Content: "Can you help me with Go programming?", MessageNumber: 3},
-		{Role: "assistant", Content: "Absolutely! Go is a great language. What specific aspect would you like to explore?", MessageNumber: 4},
-		{Role: "user", Content: "I want to learn about goroutines and channels.", MessageNumber: 5},
-		{Role: "assistant", Content: "Excellent choice! Goroutines and channels are fundamental to Go's concurrency model. Let me explain...", MessageNumber: 6},
-		{Role: "user", Content: "That's very helpful! Can you show me some examples?", MessageNumber: 7},
-		{Role: "assistant", Content: "Of course! Here are some practical examples of goroutines and channels in action...", MessageNumber: 8},
-	}
+	// messages := []types.Message{
+	// 	{Role: "user", Content: "Hello, how can you help me today?", MessageNumber: 1},
+	// 	{Role: "assistant", Content: "I'm here to help! I can assist with coding, answer questions, and much more.", MessageNumber: 2},
+	// 	{Role: "user", Content: "Can you help me with Go programming?", MessageNumber: 3},
+	// 	{Role: "assistant", Content: "Absolutely! Go is a great language. What specific aspect would you like to explore?", MessageNumber: 4},
+	// 	{Role: "user", Content: "I want to learn about goroutines and channels.", MessageNumber: 5},
+	// 	{Role: "assistant", Content: "Excellent choice! Goroutines and channels are fundamental to Go's concurrency model. Let me explain...", MessageNumber: 6},
+	// 	{Role: "user", Content: "That's very helpful! Can you show me some examples?", MessageNumber: 7},
+	// 	{Role: "assistant", Content: "Of course! Here are some practical examples of goroutines and channels in action...", MessageNumber: 8},
+	// }
 
 	// Set messages in appropriate chat view (using existing components)
-	if m.chatView != nil {
-		m.chatView.Messages = convertTypesMessagesToChatMessages(messages)
-	}
+	// if m.chatView != nil {
+	// 	m.chatView.Messages = convertTypesMessagesToChatMessages(messages)
+	// }
 }
 
 // GetPerformanceStats returns comprehensive performance statistics (using existing components)
@@ -810,8 +889,8 @@ func (m *UnifiedAppModel) GetPerformanceStats() map[string]interface{} {
 // SaveState saves the current application state
 func (m *UnifiedAppModel) SaveState() error {
 	if m.storage != nil && m.navStack != nil {
-		if data, err := m.navStack.SerializeStack(); err == nil {
-			return m.storage.SaveNavigationState(data)
+		if data, err := m.storage.LoadNavigationState(); err == nil && len(data) > 0 {
+			// _ = m.navStack.DeserializeStack(data) // Not implemented in navigation.NavigationStack
 		}
 	}
 	return nil
@@ -869,11 +948,11 @@ func NewUnifiedProgram(config *AppConfig, storage storage.NavigationStorage, log
 	return tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
 }
 
-// convertTypesMessagesToChatMessages converts []types.Message to []chat.ChatMessage
-func convertTypesMessagesToChatMessages(msgs []types.Message) []chat.ChatMessage {
-	out := make([]chat.ChatMessage, len(msgs))
+// convertTypesMessagesToChatMessages converts []types.Message to []models.ChatMessage
+func convertTypesMessagesToChatMessages(msgs []types.Message) []models.ChatMessage {
+	out := make([]models.ChatMessage, len(msgs))
 	for i, m := range msgs {
-		out[i] = chat.ChatMessage{
+		out[i] = models.ChatMessage{
 			Content: m.Content,
 			IsUser:  m.Role == "user", // Assuming Role "user" means it's a user message
 		}

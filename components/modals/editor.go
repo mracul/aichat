@@ -1,3 +1,4 @@
+package modals
 // editor.go - Defines the EditorModal for displaying a message in a read-only editor with cursor and selection support.
 // Used for viewing and copying chat messages in a modal overlay.
 
@@ -17,10 +18,11 @@ type EditorModal struct {
 	Focused     bool   // Whether the editor is focused
 	Quitting    bool   // Whether the modal is quitting
 	Message     string // Optional info/error message
+	BaseModal
 }
 
-// NewEditorModal creates a new EditorModal with the given content.
-func NewEditorModal(content string) *EditorModal {
+// NewEditorModal creates a new EditorModal with the given content and config.
+func NewEditorModal(content string, config ModalRenderConfig) *EditorModal {
 	return &EditorModal{
 		Content:     content,
 		Cursor:      0,
@@ -28,6 +30,7 @@ func NewEditorModal(content string) *EditorModal {
 		SelectEnd:   -1,
 		Focused:     true,
 		Quitting:    false,
+		BaseModal:   BaseModal{ModalRenderConfig: config, RegionWidth: 60, RegionHeight: 10},
 	}
 }
 
@@ -89,11 +92,13 @@ func (m *EditorModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the editor modal with the message content and cursor.
+// View renders the editor modal with the message content and cursor using shared modal rendering.
 func (m *EditorModal) View() string {
 	content := m.Content
 	if m.Cursor >= 0 && m.Cursor <= len(content) {
 		content = content[:m.Cursor] + "|" + content[m.Cursor:]
 	}
-	return "[Read-Only Message Editor]\n" + content + "\n" + m.Message + "\n(Esc to close, Ctrl+C/X to copy, Ctrl+I to focus input)"
+	editorContent := "[Read-Only Message Editor]\n" + content + "\n" + m.Message + "\n(Esc to close, Ctrl+C/X to copy, Ctrl+I to focus input)"
+	return m.RenderContentWithStrategy(editorContent, "modalBox")
 }
+

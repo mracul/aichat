@@ -1,14 +1,16 @@
 package navigation
+package navigation
 
 import (
 	"aichat/types"
 	"sync"
 )
 
-// NavigationStack is a thread-safe stack of ViewState objects for navigation.
+// NavigationStack is a thread-safe stack of ViewState objects for navigation and handles observer registration/unregistration.
 type NavigationStack struct {
-	mu    sync.RWMutex
-	stack []types.ViewState
+	mu      sync.RWMutex
+	stack   []types.ViewState
+	Subject types.Subject // The model/state to observe (e.g., app state, navigation context)
 }
 
 // NewNavigationStack creates a new stack with the main menu as the anchor.
@@ -16,14 +18,19 @@ func NewNavigationStack(main types.ViewState) *NavigationStack {
 	return &NavigationStack{stack: []types.ViewState{main}}
 }
 
-// Push adds a new view to the top of the stack.
+// Push adds a new view to the top of the stack and registers it as an observer if applicable.
 func (ns *NavigationStack) Push(v types.ViewState) {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
+	if ns.Subject != nil {
+		if observer, ok := v.(types.Observer); ok {
+			ns.Subject.RegisterObserver(observer)
+		}
+	}
 	ns.stack = append(ns.stack, v)
 }
 
-// Pop removes and returns the top view, but never pops the last (main menu).
+// Pop removes and returns the top view, but never pops the last (main menu). Unregisters observer if applicable.
 func (ns *NavigationStack) Pop() types.ViewState {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
@@ -32,13 +39,27 @@ func (ns *NavigationStack) Pop() types.ViewState {
 	}
 	v := ns.stack[len(ns.stack)-1]
 	ns.stack = ns.stack[:len(ns.stack)-1]
+	if ns.Subject != nil {
+		if observer, ok := v.(types.Observer); ok {
+			ns.Subject.UnregisterObserver(observer)
+		}
+	}
 	return v
 }
 
-// ReplaceTop replaces the top view with a new one.
+// ReplaceTop replaces the top view with a new one, handling observer registration/unregistration.
 func (ns *NavigationStack) ReplaceTop(v types.ViewState) {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
+	old := ns.stack[len(ns.stack)-1]
+	if ns.Subject != nil {
+		if observer, ok := old.(types.Observer); ok {
+			ns.Subject.UnregisterObserver(observer)
+		}
+		if observer, ok := v.(types.Observer); ok {
+			ns.Subject.RegisterObserver(observer)
+		}
+	}
 	ns.stack[len(ns.stack)-1] = v
 }
 
@@ -84,3 +105,4 @@ func (ns *NavigationStack) ResetToMainMenu(mainMenu types.ViewState) {
 	defer ns.mu.Unlock()
 	ns.stack = []types.ViewState{mainMenu}
 }
+

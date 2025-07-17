@@ -1,3 +1,4 @@
+package storage
 // Package storage provides JSON-backed repository implementations.
 package storage
 
@@ -311,3 +312,4 @@ func (s *JSONChatService) GetChatMetadata(name string) (*types.ChatMetadata, err
 	}
 	return &chat.Metadata, nil
 }
+

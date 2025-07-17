@@ -1,3 +1,4 @@
+package flows
 // help.go
 // Type definitions for help-related flows (show controls, show about)
 
@@ -16,3 +17,4 @@ type ShowAboutFlow struct {
 	NoticeModal types.ViewState
 	Strategy    FlowStrategy
 }
+

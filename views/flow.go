@@ -1,3 +1,4 @@
+package views
 // flow.go - Modular, extensible multi-step modal flow system for TUI navigation
 // Implements FlowViewState, ModalSet, FlowModal, FlowRunner, and robust handler integration
 // Integrates with navigation/controller and menu system
@@ -5,7 +6,6 @@
 package views
 
 import (
-	"aichat/navigation"
 	"aichat/types"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -28,7 +28,7 @@ type FlowModal interface {
 	Init() tea.Cmd
 	View() string
 	SetFlowRunner(runner FlowRunner)
-	UpdateWithContext(msg tea.Msg, ctx navigation.Context, nav navigation.Controller) (tea.Model, tea.Cmd)
+	UpdateWithContext(msg tea.Msg, ctx types.Context, nav types.Controller) (tea.Model, tea.Cmd)
 }
 
 // ModalSet represents a logical grouping or single unit of modal steps
@@ -39,7 +39,7 @@ type FlowModal interface {
 type ModalSet interface {
 	Init() tea.Cmd
 	View() string
-	UpdateWithContext(msg tea.Msg, ctx navigation.Context, nav navigation.Controller) (ModalSet, tea.Cmd)
+	UpdateWithContext(msg tea.Msg, ctx types.Context, nav types.Controller) (ModalSet, tea.Cmd)
 	SetFlowRunner(runner FlowRunner)
 	IsComplete() bool
 }
@@ -50,23 +50,27 @@ type ModalSet interface {
 // Implements ViewState interface for navigation stack integration
 // Injects context and navigation controller dependencies
 // Triggers onSuccess or onExit handlers with amassed data
+// Handles observer registration/unregistration for ModalSets/FlowModals
+
 type FlowViewState struct {
 	Steps     []ModalSet
 	StepIndex int
 	State     map[string]any
-	OnSuccess func(state map[string]any, ctx navigation.Context, nav navigation.Controller)
-	OnExit    func(state map[string]any, ctx navigation.Context, nav navigation.Controller)
-	ctx       navigation.Context
-	nav       navigation.Controller
+	OnSuccess func(state map[string]any, ctx types.Context, nav types.Controller)
+	OnExit    func(state map[string]any, ctx types.Context, nav types.Controller)
+	ctx       types.Context
+	nav       types.Controller
+	Subject   types.Subject // The model/state to observe (e.g., chat, flow, etc.)
 }
 
 // NewFlowViewState creates a new flow with the given steps and handlers
 func NewFlowViewState(
 	steps []ModalSet,
-	onSuccess func(state map[string]any, ctx navigation.Context, nav navigation.Controller),
-	onExit func(state map[string]any, ctx navigation.Context, nav navigation.Controller),
-	ctx navigation.Context,
-	nav navigation.Controller,
+	onSuccess func(state map[string]any, ctx types.Context, nav types.Controller),
+	onExit func(state map[string]any, ctx types.Context, nav types.Controller),
+	ctx types.Context,
+	nav types.Controller,
+	subject types.Subject, // new parameter for observer management
 ) *FlowViewState {
 	f := &FlowViewState{
 		Steps:     steps,
@@ -76,15 +80,34 @@ func NewFlowViewState(
 		OnExit:    onExit,
 		ctx:       ctx,
 		nav:       nav,
+		Subject:   subject,
 	}
 	if len(steps) > 0 {
 		steps[0].SetFlowRunner(f)
+		// Register as observer if applicable
+		if subject != nil {
+			if observer, ok := steps[0].(types.Observer); ok {
+				subject.RegisterObserver(observer)
+			}
+		}
 	}
 	return f
 }
 
 // Type returns the ViewType for the flow (could define a new type if desired)
 func (f *FlowViewState) Type() types.ViewType { return types.ModalStateType }
+
+// IsMainMenu returns false for FlowViewState (not a main menu)
+func (f *FlowViewState) IsMainMenu() bool { return false }
+
+// MarshalState is a stub for state serialization
+func (f *FlowViewState) MarshalState() ([]byte, error) { return nil, nil }
+
+// UnmarshalState is a stub for state deserialization
+func (f *FlowViewState) UnmarshalState([]byte) error { return nil }
+
+// ViewType returns the ViewType for the flow (for interface compliance)
+func (f *FlowViewState) ViewType() types.ViewType { return types.ModalStateType }
 
 // Init is a no-op for the flow
 func (f *FlowViewState) Init() tea.Cmd { return nil }
@@ -102,16 +125,28 @@ func (f *FlowViewState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return f.UpdateWithContext(msg, f.ctx, f.nav)
 }
 
-// OOP-style update
-func (f *FlowViewState) UpdateWithContext(msg tea.Msg, ctx navigation.Context, nav navigation.Controller) (tea.Model, tea.Cmd) {
+// In UpdateWithContext, handle observer registration/unregistration on step change
+func (f *FlowViewState) UpdateWithContext(msg tea.Msg, ctx types.Context, nav types.Controller) (tea.Model, tea.Cmd) {
 	if f.StepIndex < len(f.Steps) {
 		set, cmd := f.Steps[f.StepIndex].UpdateWithContext(msg, ctx, nav)
 		f.Steps[f.StepIndex] = set
 		if set.IsComplete() {
+			// Unregister old step as observer if applicable
+			if f.Subject != nil {
+				if observer, ok := set.(types.Observer); ok {
+					f.Subject.UnregisterObserver(observer)
+				}
+			}
 			// Advance to next step
 			f.StepIndex++
 			if f.StepIndex < len(f.Steps) {
 				f.Steps[f.StepIndex].SetFlowRunner(f)
+				// Register new step as observer if applicable
+				if f.Subject != nil {
+					if observer, ok := f.Steps[f.StepIndex].(types.Observer); ok {
+						f.Subject.RegisterObserver(observer)
+					}
+				}
 			} else {
 				// Flow complete
 				if f.OnSuccess != nil {
@@ -173,7 +208,7 @@ func (s *BasicModalSet) View() string {
 	return s.Modal.View()
 }
 
-func (s *BasicModalSet) UpdateWithContext(msg tea.Msg, ctx navigation.Context, nav navigation.Controller) (ModalSet, tea.Cmd) {
+func (s *BasicModalSet) UpdateWithContext(msg tea.Msg, ctx types.Context, nav types.Controller) (ModalSet, tea.Cmd) {
 	if s.complete {
 		return s, nil
 	}
@@ -246,7 +281,7 @@ func (m *InputFlowModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // UpdateWithContext handles user input and signals Next or Cancel
-func (m *InputFlowModal) UpdateWithContext(msg tea.Msg, ctx navigation.Context, nav navigation.Controller) (tea.Model, tea.Cmd) {
+func (m *InputFlowModal) UpdateWithContext(msg tea.Msg, ctx types.Context, nav types.Controller) (tea.Model, tea.Cmd) {
 	if m.completed {
 		return m, nil
 	}
@@ -288,9 +323,9 @@ func (m *InputFlowModal) UpdateWithContext(msg tea.Msg, ctx navigation.Context, 
 // Accumulates state and calls onSuccess with the collected data.
 // Usage: Call from a menu action or controller to launch the flow.
 func CreateNewChatFlow(
-	ctx navigation.Context,
-	nav navigation.Controller,
-	onSuccess func(state map[string]any, ctx navigation.Context, nav navigation.Controller),
+	ctx types.Context,
+	nav types.Controller,
+	onSuccess func(state map[string]any, ctx types.Context, nav types.Controller),
 ) {
 	steps := []ModalSet{
 		NewBasicModalSet(NewInputFlowModal("Enter chat title", "title")),
@@ -300,10 +335,11 @@ func CreateNewChatFlow(
 	flow := NewFlowViewState(
 		steps,
 		onSuccess,
-		func(state map[string]any, ctx navigation.Context, nav navigation.Controller) {
+		func(state map[string]any, ctx types.Context, nav types.Controller) {
 			// Default onExit: do nothing (could show a notice or return to menu)
 		},
 		ctx, nav,
+		nil, // No subject for this flow
 	)
 	nav.Push(flow)
 }
@@ -316,27 +352,28 @@ func CreateNewChatFlow(
 // Uses defaults for prompt and model (can be parameterized or hardcoded).
 // Usage: Call from a menu action or controller to launch the flow.
 func CreateNewChatSimpleFlow(
-	ctx navigation.Context,
-	nav navigation.Controller,
+	ctx types.Context,
+	nav types.Controller,
 	defaultPrompt string,
 	defaultModel string,
-	onSuccess func(state map[string]any, ctx navigation.Context, nav navigation.Controller),
+	onSuccess func(state map[string]any, ctx types.Context, nav types.Controller),
 ) {
 	steps := []ModalSet{
 		NewBasicModalSet(NewInputFlowModal("Enter chat title", "title")),
 	}
 	flow := NewFlowViewState(
 		steps,
-		func(state map[string]any, ctx navigation.Context, nav navigation.Controller) {
+		func(state map[string]any, ctx types.Context, nav types.Controller) {
 			// Add defaults to state before calling onSuccess
 			state["prompt"] = defaultPrompt
 			state["model"] = defaultModel
 			onSuccess(state, ctx, nav)
 		},
-		func(state map[string]any, ctx navigation.Context, nav navigation.Controller) {
+		func(state map[string]any, ctx types.Context, nav types.Controller) {
 			// Default onExit: do nothing (could show a notice or return to menu)
 		},
 		ctx, nav,
+		nil, // No subject for this flow
 	)
 	nav.Push(flow)
 }
@@ -345,7 +382,7 @@ func CreateNewChatSimpleFlow(
 // Usage Example
 // =========================
 // In a menu action or controller:
-// CreateNewChatFlow(ctx, nav, func(state map[string]any, ctx navigation.Context, nav navigation.Controller) {
+// CreateNewChatFlow(ctx, nav, func(state map[string]any, ctx types.Context, nav types.Controller) {
 //     // Handle the new chat creation with collected state
 //     title := state["title"].(string)
 //     prompt := state["prompt"].(string)
@@ -353,10 +390,11 @@ func CreateNewChatSimpleFlow(
 //     // ... create chat, update UI, etc. ...
 // })
 // In a menu action or controller:
-// CreateNewChatSimpleFlow(ctx, nav, "Default prompt text", "gpt-3.5-turbo", func(state map[string]any, ctx navigation.Context, nav navigation.Controller) {
+// CreateNewChatSimpleFlow(ctx, nav, "Default prompt text", "gpt-3.5-turbo", func(state map[string]any, ctx types.Context, nav types.Controller) {
 //     // Handle the new chat creation with collected state
 //     title := state["title"].(string)
 //     prompt := state["prompt"].(string) // will be default
 //     model := state["model"].(string)   // will be default
 //     // ... create chat, update UI, etc. ...
 // })
+

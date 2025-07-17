@@ -1,3 +1,4 @@
+package flows
 // chatwindow.go
 // Type definitions for chat window flows (export, rename, search, threading)
 
@@ -18,3 +19,4 @@ type ThreadingFlow struct {
 	NoticeModal types.ViewState
 	Strategy    FlowStrategy
 }
+

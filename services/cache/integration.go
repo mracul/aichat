@@ -1,3 +1,4 @@
+package cache
 // Package cache provides integration utilities for the caching system.
 package cache
 
@@ -201,3 +202,4 @@ func GetGlobalCacheHealth() CacheHealth {
 	integration := GetGlobalCacheIntegration()
 	return integration.GetHealth()
 }
+

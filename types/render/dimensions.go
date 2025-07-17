@@ -1,3 +1,4 @@
+package render
 // dimensions.go
 // Common dimension and render strategy types for TUI components (menus, notices, inputs, etc.)
 // Designed for use with Bubble Tea and lipgloss, supporting theming and responsive layouts.
@@ -74,3 +75,4 @@ var DefaultRenderStrategies = map[RenderViewType]RenderStrategy{
 }
 
 // You can add more strategies as needed for other component types.
+

@@ -1,3 +1,4 @@
+package cache
 // Package cache provides configuration management for the caching system.
 package cache
 
@@ -178,3 +179,4 @@ func (ccm *CacheConfigManager) ApplyRecommendedConfig() error {
 	recommended := ccm.GetRecommendedConfig()
 	return ccm.UpdateConfig(recommended)
 }
+

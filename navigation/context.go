@@ -1,4 +1,5 @@
 package navigation
+package navigation
 
 import (
 	"aichat/services/storage"
@@ -28,3 +29,4 @@ func (ctx *AppContext) GUI() interface{}                   { return ctx.gui }
 func (ctx *AppContext) Storage() storage.NavigationStorage { return ctx.storage }
 func (ctx *AppContext) Config() interface{}                { return ctx.config }
 func (ctx *AppContext) Logger() *slog.Logger               { return ctx.logger }
+

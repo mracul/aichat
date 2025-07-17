@@ -1,3 +1,4 @@
+package render
 // strategy.go
 // Decorator and utility for applying render strategies to views (Bubble Tea/lipgloss)
 
@@ -41,3 +42,4 @@ func ApplyStrategy(content string, strategy RenderStrategy, theme Theme) string 
 	}
 	return style.Render(content)
 }
+

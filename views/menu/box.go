@@ -1,3 +1,4 @@
+package menu
 // box.go: Provides the MenuBoxView component for rendering menu headings and items.
 
 package menu
@@ -30,21 +31,36 @@ func MenuBoxView(styles interface {
 		Height(max(400, height)).
 		Align(lipgloss.Center)
 
-	heading := lipgloss.PlaceHorizontal(boxWidth, lipgloss.Center, getMenuTitle(menuView.Type))
+	// Calculate max width of menu entries (text + description)
+	maxEntryWidth := 0
+	entries := types.GetMenuEntries(menuView.MenuType())
+	for _, option := range entries {
+		entryLen := lipgloss.Width(option.Text)
+		if option.Description != "" {
+			entryLen += 3 + lipgloss.Width(option.Description) // ' - '
+		}
+		if entryLen > maxEntryWidth {
+			maxEntryWidth = entryLen
+		}
+	}
+	// Center the block of entries in the box
+	blockWidth := maxEntryWidth
+	if blockWidth > boxWidth-8 { // ensure it doesn't overflow
+		blockWidth = boxWidth - 8
+	}
+
+	// Heading with larger top margin
+	heading := lipgloss.NewStyle().MarginTop(1).Width(boxWidth).Align(lipgloss.Center).Render(getMenuTitle(menuView.MenuType()))
 
 	var menuLines []string
-	for i, option := range types.Menus[menuView.Type].Entries {
+	for i, option := range entries {
 		line := option.Text
-		if option.Description != "" {
+		// Only show description for main menu
+		if menuView.IsMainMenu() && option.Description != "" {
 			line += " - " + option.Description
 		}
-		var itemStyle lipgloss.Style
-		if option.Description != "" {
-			itemStyle = lipgloss.NewStyle().Width(boxWidth).Align(lipgloss.Left)
-		} else {
-			itemStyle = lipgloss.NewStyle().Width(boxWidth).Align(lipgloss.Center)
-		}
-		if i == menuView.Selected {
+		itemStyle := lipgloss.NewStyle().Width(boxWidth).Align(lipgloss.Center)
+		if i == menuView.Cursor() {
 			line = styles.SelectedStyle().Render(line)
 		} else {
 			line = styles.TextStyle().Render(line)
@@ -56,3 +72,4 @@ func MenuBoxView(styles interface {
 	}
 	return boxStyle.Render(lipgloss.JoinVertical(lipgloss.Left, heading, "", lipgloss.JoinVertical(lipgloss.Left, menuLines...)))
 }
+

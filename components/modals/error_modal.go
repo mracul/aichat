@@ -1,3 +1,4 @@
+package modals
 // Package modals provides animated error handling components with dynamic feedback
 package modals
 
@@ -6,10 +7,9 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-
 	"aichat/errors"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // =====================================================================================
@@ -45,10 +45,7 @@ type ErrorModal struct {
 	Width  int
 	Height int
 
-	// [MIGRATION] Use RenderStrategy and Theme for all rendering in ErrorModal.
-	// Replace direct lipgloss.NewStyle() and hardcoded colors with ApplyStrategy and ThemeMap lookups.
-	// Add a ThemeMap field to ErrorModal and use it in View().
-	ThemeMap map[string]lipgloss.Style
+	BaseModal
 }
 
 // Commands for animation and state updates
@@ -75,7 +72,7 @@ func errorResolve(success bool) tea.Cmd {
 }
 
 // NewErrorModal creates a new animated error modal
-func NewErrorModal(err *errors.DomainError, retryConfig errors.RetryConfig, onRetry func() error) *ErrorModal {
+func NewErrorModal(err *errors.DomainError, retryConfig errors.RetryConfig, onRetry func() error, config ModalRenderConfig) *ErrorModal {
 	return &ErrorModal{
 		Error:       err,
 		State:       ErrorStateInitial,
@@ -85,7 +82,7 @@ func NewErrorModal(err *errors.DomainError, retryConfig errors.RetryConfig, onRe
 		Width:       60,
 		Height:      15,
 		LastUpdate:  time.Now(),
-		ThemeMap:    make(map[string]lipgloss.Style),
+		BaseModal:   BaseModal{ModalRenderConfig: config, RegionWidth: 60, RegionHeight: 15},
 	}
 }
 
@@ -165,18 +162,8 @@ func (m *ErrorModal) View() string {
 	content.WriteString("\n\n")
 	content.WriteString(footer)
 
-	// Wrap in modal box
-	return lipgloss.Place(
-		m.Width, m.Height,
-		lipgloss.Center, lipgloss.Center,
-		lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("203")).
-			Padding(1, 2).
-			Width(m.Width-4).
-			Height(m.Height-4).
-			Render(content.String()),
-	)
+	// Wrap in modal box using shared utility
+	return m.RenderContentWithStrategy(content.String(), "modalBox")
 }
 
 // =====================================================================================
@@ -186,120 +173,47 @@ func (m *ErrorModal) View() string {
 func (m *ErrorModal) renderHeader() string {
 	errorType := string(m.Error.Type)
 	status := m.getStatusText()
-
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("203"))
-
-	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("244"))
-
-	return fmt.Sprintf("%s • %s",
-		headerStyle.Render(strings.ToUpper(errorType)),
-		statusStyle.Render(status))
+	header := fmt.Sprintf("%s • %s", strings.ToUpper(errorType), status)
+	return m.RenderContentWithStrategy(header, "header")
 }
 
 func (m *ErrorModal) renderInitial() string {
-	content := strings.Builder{}
-
-	// Error message
-	msgStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
-	content.WriteString(msgStyle.Render(m.Error.UserMsg))
-	content.WriteString("\n\n")
-
-	// Technical details (if available)
+	content := m.Error.UserMsg + "\n\n"
 	if len(m.Error.Details) > 0 {
-		detailStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Italic(true)
-		content.WriteString(detailStyle.Render("Analyzing error details..."))
+		content += "Analyzing error details..."
 	}
-
-	return content.String()
+	return m.RenderContentWithStrategy(content, "error")
 }
 
 func (m *ErrorModal) renderAnalyzing() string {
 	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinner := spinners[m.SpinnerIndex%len(spinners)]
-
-	content := strings.Builder{}
-
-	analyzingStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39"))
-	content.WriteString(analyzingStyle.Render(fmt.Sprintf("%s Analyzing error...", spinner)))
-	content.WriteString("\n\n")
-
-	// Show error details being analyzed
-	details := m.renderErrorDetails()
-	content.WriteString(details)
-
-	return content.String()
+	content := fmt.Sprintf("%s Analyzing error...\n\n%s", spinner, m.renderErrorDetails())
+	return m.RenderContentWithStrategy(content, "analyzing")
 }
 
 func (m *ErrorModal) renderRetrying() string {
 	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinner := spinners[m.SpinnerIndex%len(spinners)]
-
-	content := strings.Builder{}
-
-	retryStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("220"))
-	content.WriteString(retryStyle.Render(fmt.Sprintf("%s Retrying... (Attempt %d/%d)",
-		spinner, m.Attempts, m.MaxAttempts)))
-	content.WriteString("\n\n")
-
-	// Show retry progress
-	progress := m.renderRetryProgress()
-	content.WriteString(progress)
-
-	return content.String()
+	content := fmt.Sprintf("%s Retrying... (Attempt %d/%d)\n\n%s", spinner, m.Attempts, m.MaxAttempts, m.renderRetryProgress())
+	return m.RenderContentWithStrategy(content, "retrying")
 }
 
 func (m *ErrorModal) renderResolved() string {
-	content := strings.Builder{}
-
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("82")).
-		Bold(true)
-	content.WriteString(successStyle.Render("✅ Issue resolved!"))
-	content.WriteString("\n\n")
-
-	resolvedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
-	content.WriteString(resolvedStyle.Render("The problem has been fixed automatically."))
-
-	return content.String()
+	content := "✅ Issue resolved!\n\nThe problem has been fixed automatically."
+	return m.RenderContentWithStrategy(content, "resolved")
 }
 
 func (m *ErrorModal) renderFailed() string {
-	content := strings.Builder{}
-
-	failedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("203")).
-		Bold(true)
-	content.WriteString(failedStyle.Render("❌ Unable to resolve automatically"))
-	content.WriteString("\n\n")
-
-	// Show final error message
-	msgStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
-	content.WriteString(msgStyle.Render(m.Error.UserMsg))
-	content.WriteString("\n\n")
-
-	// Show retry suggestion if applicable
+	content := "❌ Unable to resolve automatically\n\n" + m.Error.UserMsg + "\n\n"
 	if m.Error.Retryable {
-		retryStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("220"))
-		content.WriteString(retryStyle.Render("Press 'r' to retry manually"))
+		content += "Press 'r' to retry manually"
 	}
-
-	return content.String()
+	return m.RenderContentWithStrategy(content, "failed")
 }
 
 func (m *ErrorModal) renderFooter() string {
 	var controls []string
-
 	switch m.State {
 	case ErrorStateFailed:
 		if m.Error.Retryable {
@@ -311,42 +225,24 @@ func (m *ErrorModal) renderFooter() string {
 	default:
 		controls = append(controls, "Esc: Cancel")
 	}
-
-	footerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Italic(true)
-
-	return footerStyle.Render(strings.Join(controls, " • "))
+	return m.RenderContentWithStrategy(strings.Join(controls, " • "), "footer")
 }
 
 func (m *ErrorModal) renderErrorDetails() string {
 	if len(m.Error.Details) == 0 {
 		return ""
 	}
-
-	content := strings.Builder{}
-	detailStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("244"))
-
-	content.WriteString(detailStyle.Render("Error Details:\n"))
+	var details string
+	details += "Error Details:\n"
 	for k, v := range m.Error.Details {
-		content.WriteString(detailStyle.Render(fmt.Sprintf("  %s: %v\n", k, v)))
+		details += fmt.Sprintf("  %s: %v\n", k, v)
 	}
-
-	return content.String()
+	return m.RenderContentWithStrategy(details, "details")
 }
 
 func (m *ErrorModal) renderRetryProgress() string {
-	content := strings.Builder{}
-	progressStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("244"))
-
-	// Show retry configuration
-	content.WriteString(progressStyle.Render(fmt.Sprintf("Retry Strategy: %s\n", m.RetryConfig.Backoff)))
-	content.WriteString(progressStyle.Render(fmt.Sprintf("Max Attempts: %d\n", m.RetryConfig.MaxAttempts)))
-	content.WriteString(progressStyle.Render(fmt.Sprintf("Initial Delay: %v", m.RetryConfig.InitialDelay)))
-
-	return content.String()
+	content := fmt.Sprintf("Retry Strategy: %s\nMax Attempts: %d\nInitial Delay: %v", m.RetryConfig.Backoff, m.RetryConfig.MaxAttempts, m.RetryConfig.InitialDelay)
+	return m.RenderContentWithStrategy(content, "progress")
 }
 
 // =====================================================================================
@@ -437,3 +333,4 @@ func (m *ErrorModal) IsResolved() bool {
 func (m *ErrorModal) IsFailed() bool {
 	return m.State == ErrorStateFailed
 }
+

@@ -1,10 +1,12 @@
+package menus
 // ChatMenu.go - Contains all logic for the Chats menu and its flows in the menu system.
 // This includes actions for listing chats, favoriting/unfavoriting, renaming, previewing, and launching chats.
 
 package menus
 
 import (
-	"aichat/src/types"
+	"aichat/types"
+	"aichat/types/render"
 )
 
 // MenuState represents the current and previous state for menu/modal navigation.
@@ -33,11 +35,27 @@ type InputPromptModal struct {
 	ControlInfo string
 	ActionInfo  string
 	Prev        string
+	ThemeMap    render.ThemeMap
+	Strategy    render.RenderStrategy
 }
 
-// View renders the input prompt modal.
+// Observer pattern: implement types.Observer
+func (m *InputPromptModal) Notify(event interface{}) {
+	if ev, ok := event.(types.Event); ok {
+		switch ev.Type {
+		case "chat_renamed":
+			// Optionally update prompt or close modal if relevant
+		case "chat_list_updated":
+			// Optionally update modal state if relevant
+		}
+	}
+}
+
+// View renders the input prompt modal using ThemeMap and RenderStrategy.
 func (m *InputPromptModal) View() string {
-	return "" // TODO: Render ASCII art, prompt, input box, control info centered
+	content := m.Prompt + "\n" + m.Input + "\n" + m.ControlInfo + "\n" + m.ActionInfo
+	theme := m.ThemeMap[m.Strategy.ThemeKey]
+	return render.ApplyStrategy(content, m.Strategy, theme)
 }
 
 // Update handles input for the input prompt modal.
@@ -50,13 +68,28 @@ func (m *InputPromptModal) GetPrev() string { return m.Prev }
 
 // NoticeModal displays a notice message (e.g., rename result).
 type NoticeModal struct {
-	Message string
-	Prev    string
+	Message  string
+	Prev     string
+	ThemeMap render.ThemeMap
+	Strategy render.RenderStrategy
 }
 
-// View renders the notice modal.
+// Observer pattern: implement types.Observer
+func (m *NoticeModal) Notify(event interface{}) {
+	if ev, ok := event.(types.Event); ok {
+		switch ev.Type {
+		case "chat_deleted":
+			// Optionally update message or close modal if relevant
+		case "favorite_toggled":
+			// Optionally update message if relevant
+		}
+	}
+}
+
+// View renders the notice modal using ThemeMap and RenderStrategy.
 func (m *NoticeModal) View() string {
-	return "" // TODO: Render centered notice message
+	theme := m.ThemeMap[m.Strategy.ThemeKey]
+	return render.ApplyStrategy(m.Message, m.Strategy, theme)
 }
 
 // Update handles input for the notice modal.
@@ -96,3 +129,4 @@ func loadAllChats() ([]string, error) {
 func loadChatMetadata(chatName string) (*types.ChatMetadata, error) {
 	return nil, nil // TODO: Implement metadata loading
 }
+

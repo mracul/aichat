@@ -1,21 +1,57 @@
-// menuentryset.go - Defines all menu entry sets for the app's menus and submenus.
-// This file centralizes all menu data for extensibility and maintainability.
+package types
+// Menu Structure (Canonical)
+//
+// Main Menu
+// ├── Chats
+// │   ├── Add new chat (input modal)
+// │   ├── List Chats (list view: d=delete, f=favorite, r=rename)
+// │   └── Create custom chat (multi-step: name → select prompt → select model)
+// ├── Prompts
+// │   ├── Add new prompt (input modal - multi step: prompt name then prompt for the text)
+// │   ├── Set default prompt (list view)
+// │   └── Delete prompt (list view)
+// ├── Models
+// │   ├── Add model (input modal - multi step: prompt name then prompt for model string)
+// │   └── List models (list view: a=set active, d=delete, r=rename)
+// ├── Help
+// │   ├── Show control overview (modal)
+// │   └── Show about (modal)
+// ├── Settings
+// │   ├── API Keys
+// │   │   ├── Add key (input modal multi step - input name, then key, then select provider from list of providers) key stored in schema [name, key, provider, active] json
+// │   │   └── Set active key (list view)
+// │   ├── Providers
+// │   │   └── Add provider (input modal multi step - name then endpoint)
+// │   └── Themes
+// │       ├── List themes (list view: preview on highlight, set on enter, r rename, d delete)
+// │       └── Generate theme (input prompt for name then action)
+// └── Exit (confirmation modal)
 
 package types
 
-// Remove incorrect import and use local types
+import (
+	"aichat/components/menus"
+	"aichat/interfaces"
+)
 
 var MainMenuEntries MenuEntrySet
 var SettingsMenuEntries MenuEntrySet
 var ProvidersMenuEntries MenuEntrySet
 var ThemesMenuEntries MenuEntrySet
+var ChatsMenuEntries MenuEntrySet
+var FavoritesMenuEntries MenuEntrySet
+var PromptsMenuEntries MenuEntrySet
+var ModelsMenuEntries MenuEntrySet
+var APIKeyMenuEntries MenuEntrySet
+var HelpMenuEntries MenuEntrySet
+var ExitMenuEntries MenuEntrySet
 
 func init() {
 	MainMenuEntries = MenuEntrySet{
 		{
 			Text:        "Chats",
 			Description: "View and manage chats",
-			Action: func(ctx Context, nav Controller) error {
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
 				nav.Push(NewMenuViewState(ChatsMenu, getMenuEntries(ChatsMenu), menuTypeToString(ChatsMenu), ctx, nav))
 				return nil
 			},
@@ -23,7 +59,7 @@ func init() {
 		{
 			Text:        "Prompts",
 			Description: "Manage prompt templates",
-			Action: func(ctx Context, nav Controller) error {
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
 				nav.Push(NewMenuViewState(PromptsMenu, getMenuEntries(PromptsMenu), menuTypeToString(PromptsMenu), ctx, nav))
 				return nil
 			},
@@ -31,7 +67,7 @@ func init() {
 		{
 			Text:        "Models",
 			Description: "Configure AI models",
-			Action: func(ctx Context, nav Controller) error {
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
 				nav.Push(NewMenuViewState(ModelsMenu, getMenuEntries(ModelsMenu), menuTypeToString(ModelsMenu), ctx, nav))
 				return nil
 			},
@@ -39,7 +75,7 @@ func init() {
 		{
 			Text:        "Help",
 			Description: "Show help and shortcuts",
-			Action: func(ctx Context, nav Controller) error {
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
 				nav.Push(NewMenuViewState(HelpMenu, getMenuEntries(HelpMenu), menuTypeToString(HelpMenu), ctx, nav))
 				return nil
 			},
@@ -47,8 +83,7 @@ func init() {
 		{
 			Text:        "Settings",
 			Description: "Configure application settings",
-			Action: func(ctx Context, nav Controller) error {
-				// Placeholder: implement SettingsMenu and its entries/flow
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
 				nav.Push(NewMenuViewState(SettingsMenu, getMenuEntries(SettingsMenu), menuTypeToString(SettingsMenu), ctx, nav))
 				return nil
 			},
@@ -56,8 +91,11 @@ func init() {
 		{
 			Text:        "Exit",
 			Description: "Exit the application",
-			Action: func(ctx Context, nav Controller) error {
-				nav.Push(NewMenuViewState(ExitMenu, getMenuEntries(ExitMenu), menuTypeToString(ExitMenu), ctx, nav))
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
+				// Indirect through high-level handler to avoid import cycle
+				if handler, ok := nav.(interface{ HandleExit() }); ok {
+					handler.HandleExit()
+				}
 				return nil
 			},
 		},
@@ -67,292 +105,207 @@ func init() {
 		{
 			Text:        "List Chats",
 			Description: "View or continue existing chats",
-			Action:      nil,
+			Action:      menus.ListChatsAction,
 		},
 		{
 			Text:        "Add New Chat",
 			Description: "Create a new chat",
-			Action:      nil,
+			Action:      menus.NewChatAction,
 		},
 		{
-			Text:        "Custom Chat",
-			Description: "Custom chat creation (name, model, prompt)",
-			Action:      nil,
+			Text:        "Create Custom Chat",
+			Description: "Multi-step: name → select prompt → select model",
+			Action:      menus.CustomChatAction,
 		},
 		{
-			Text:        "Load Chat",
-			Description: "Load a saved chat",
-			Action:      nil,
-		},
-		{
-			Text:        "Back",
-			Description: "Return to main menu",
-			Next:        MainMenu,
-			Action:      nil,
-		},
-	}
-
-	FavoritesMenuEntries = MenuEntrySet{
-		{
-			Text:        "List Favorites",
-			Description: "View favorite chats",
-			Action:      nil,
-		},
-		{
-			Text:        "Add Favorite",
-			Description: "Mark a chat as favorite",
-			Action:      nil,
-		},
-		{
-			Text:        "Remove Favorite",
-			Description: "Unmark a chat as favorite",
-			Action:      nil,
-		},
-		{
-			Text:        "Back",
-			Description: "Return to main menu",
-			Next:        MainMenu,
-			Action:      nil,
+			Text:   "Back",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error { nav.Pop(); return nil },
 		},
 	}
 
 	PromptsMenuEntries = MenuEntrySet{
 		{
-			Text:        "List Prompts",
-			Description: "View all prompts",
-			Action:      nil,
+			Text:   "List Prompts",
+			Action: menus.ListPromptsAction,
 		},
 		{
-			Text:        "Add Prompt",
-			Description: "Create a new prompt",
-			Action:      nil,
+			Text:   "Add New Prompt",
+			Action: menus.AddPromptAction,
 		},
 		{
-			Text:        "Remove Prompt",
-			Description: "Delete a prompt",
-			Action:      nil,
+			Text:   "Set Default Prompt",
+			Action: menus.SetDefaultPromptAction,
 		},
 		{
-			Text:        "Set Default Prompt",
-			Description: "Choose default prompt",
-			Action:      nil,
+			Text:   "Delete Prompt",
+			Action: menus.DeletePromptAction,
 		},
 		{
-			Text:        "Back",
-			Description: "Return to main menu",
-			Next:        MainMenu,
-			Action:      nil,
+			Text:   "Back",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error { nav.Pop(); return nil },
 		},
 	}
 
 	ModelsMenuEntries = MenuEntrySet{
 		{
-			Text:        "List Models",
-			Description: "View all models",
-			Action:      nil,
+			Text:   "List Models",
+			Action: menus.ListModelsAction,
 		},
 		{
-			Text:        "Add Model",
-			Description: "Add a new model",
-			Action:      nil,
+			Text:   "Add Model",
+			Action: menus.AddModelAction,
 		},
 		{
-			Text:        "Remove Model",
-			Description: "Delete a model",
-			Action:      nil,
+			Text:   "Set Default Model",
+			Action: menus.SetDefaultModelAction,
 		},
 		{
-			Text:        "Set Default Model",
-			Description: "Choose default model",
-			Action:      nil,
+			Text:   "Delete Model",
+			Action: menus.DeleteModelAction,
 		},
 		{
-			Text:        "Back",
-			Description: "Return to main menu",
-			Next:        MainMenu,
-			Action:      nil,
-		},
-	}
-
-	APIKeyMenuEntries = MenuEntrySet{
-		{
-			Text:        "List API Keys",
-			Description: "View all API keys",
-			Action:      nil,
-		},
-		{
-			Text:        "Add API Key",
-			Description: "Add a new API key",
-			Action:      nil,
-		},
-		{
-			Text:        "Remove API Key",
-			Description: "Delete an API key",
-			Action:      nil,
-		},
-		{
-			Text:        "Set Active API Key",
-			Description: "Choose which key is active",
-			Action:      nil,
-		},
-		{
-			Text:        "Test Active Key",
-			Description: "Test the current key with a model",
-			Action:      nil,
-		},
-		{
-			Text:        "Back",
-			Description: "Return to main menu",
-			Next:        MainMenu,
-			Action:      nil,
-		},
-	}
-
-	HelpMenuEntries = MenuEntrySet{
-		{
-			Text:        "Show Controls",
-			Description: "Display controls cheat sheet",
-			Action:      nil,
-		},
-		{
-			Text:        "Show About",
-			Description: "Display about information",
-			Action:      nil,
-		},
-		{
-			Text:        "Back",
-			Description: "Return to main menu",
-			Next:        MainMenu,
-			Action:      nil,
-		},
-	}
-
-	ExitMenuEntries = MenuEntrySet{
-		{
-			Text:        "Confirm Exit",
-			Description: "Exit the application",
-			Action:      nil,
-		},
-		{
-			Text:        "Cancel",
-			Description: "Return to main menu",
-			Next:        MainMenu,
-			Action:      nil,
+			Text:   "Back",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error { nav.Pop(); return nil },
 		},
 	}
 
 	SettingsMenuEntries = MenuEntrySet{
 		{
-			Text:        "API Keys",
-			Description: "Manage API keys",
-			Action: func(ctx Context, nav Controller) error {
-				nav.Push(NewMenuViewState(APIKeyMenu, getMenuEntries(APIKeyMenu), menuTypeToString(APIKeyMenu), ctx, nav))
+			Text: "API Keys",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
+				nav.Push(NewMenuViewState(APIKeyMenu, getMenuEntries(APIKeyMenu), "API Keys", ctx, nav))
 				return nil
 			},
 		},
 		{
-			Text:        "Providers",
-			Description: "Configure AI providers",
-			Action: func(ctx Context, nav Controller) error {
-				nav.Push(NewMenuViewState(ProvidersMenu, getMenuEntries(ProvidersMenu), menuTypeToString(ProvidersMenu), ctx, nav))
+			Text: "Providers",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
+				nav.Push(NewMenuViewState(ProvidersMenu, getMenuEntries(ProvidersMenu), "Providers", ctx, nav))
 				return nil
 			},
 		},
 		{
-			Text:        "Themes",
-			Description: "Select application theme",
-			Action: func(ctx Context, nav Controller) error {
-				nav.Push(NewMenuViewState(ThemesMenu, getMenuEntries(ThemesMenu), menuTypeToString(ThemesMenu), ctx, nav))
+			Text: "Themes",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error {
+				nav.Push(NewMenuViewState(ThemesMenu, getMenuEntries(ThemesMenu), "Themes", ctx, nav))
 				return nil
 			},
 		},
 		{
-			Text:        "Back",
-			Description: "Return to main menu",
-			Action: func(ctx Context, nav Controller) error {
-				nav.Pop()
-				return nil
-			},
+			Text:   "Back",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error { nav.Pop(); return nil },
+		},
+	}
+
+	APIKeyMenuEntries = MenuEntrySet{
+		{
+			Text:   "List API Keys",
+			Action: menus.ListAPIKeysAction,
+		},
+		{
+			Text:   "Add API Key",
+			Action: menus.AddAPIKeyAction,
+		},
+		{
+			Text:   "Set Active API Key",
+			Action: menus.SetActiveAPIKeyAction,
+		},
+		{
+			Text:   "Delete API Key",
+			Action: menus.DeleteAPIKeyAction,
+		},
+		{
+			Text:   "Back",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error { nav.Pop(); return nil },
 		},
 	}
 
 	ProvidersMenuEntries = MenuEntrySet{
 		{
-			Text:        "Back",
-			Description: "Return to settings",
-			Action: func(ctx Context, nav Controller) error {
-				nav.Pop()
-				return nil
-			},
+			Text:   "List Providers",
+			Action: menus.ListProvidersAction,
+		},
+		{
+			Text:   "Add Provider",
+			Action: menus.AddProviderAction,
+		},
+		{
+			Text:   "Back",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error { nav.Pop(); return nil },
 		},
 	}
 
 	ThemesMenuEntries = MenuEntrySet{
 		{
-			Text:        "Back",
-			Description: "Return to settings",
-			Action: func(ctx Context, nav Controller) error {
-				nav.Pop()
-				return nil
-			},
+			Text:   "List Themes",
+			Action: menus.ListThemesAction,
+		},
+		{
+			Text:   "Generate Theme",
+			Action: menus.GenerateThemeAction,
+		},
+		{
+			Text:   "Back",
+			Action: func(ctx interfaces.Context, nav interfaces.Controller) error { nav.Pop(); return nil },
 		},
 	}
 }
 
-// ChatsMenuEntries defines the chats submenu options.
-var ChatsMenuEntries = MenuEntrySet{
-	{Text: "List Chats", Description: "View or continue existing chats"},
-	{Text: "Add New Chat", Description: "Create a new chat"},
-	{Text: "Custom Chat", Description: "Custom chat creation (name, model, prompt)"},
-	{Text: "Load Chat", Description: "Load a saved chat"},
-	{Text: "Back", Description: "Return to main menu", Next: MainMenu},
+// Exported function for external use
+func GetMenuEntries(menuType MenuType) MenuEntrySet {
+	switch menuType {
+	case MainMenu:
+		return MainMenuEntries
+	case ChatsMenu:
+		return ChatsMenuEntries
+	case FavoritesMenu:
+		return FavoritesMenuEntries
+	case PromptsMenu:
+		return PromptsMenuEntries
+	case ModelsMenu:
+		return ModelsMenuEntries
+	case APIKeyMenu:
+		return APIKeyMenuEntries
+	case HelpMenu:
+		return HelpMenuEntries
+	case ExitMenu:
+		return ExitMenuEntries
+	case SettingsMenu:
+		return SettingsMenuEntries
+	case ProvidersMenu:
+		return ProvidersMenuEntries
+	case ThemesMenu:
+		return ThemesMenuEntries
+	default:
+		return nil
+	}
 }
 
-// FavoritesMenuEntries defines the favorites submenu options.
-var FavoritesMenuEntries = MenuEntrySet{
-	{Text: "List Favorites", Description: "View favorite chats"},
-	{Text: "Add Favorite", Description: "Mark a chat as favorite"},
-	{Text: "Remove Favorite", Description: "Unmark a chat as favorite"},
-	{Text: "Back", Description: "Return to main menu", Next: MainMenu},
+// menuTypeToString returns a human-readable menu name (local helper)
+func menuTypeToString(mt MenuType) string {
+	switch mt {
+	case MainMenu:
+		return "Main Menu"
+	case ChatsMenu:
+		return "Chats"
+	case PromptsMenu:
+		return "Prompts"
+	case ModelsMenu:
+		return "Models"
+	case APIKeyMenu:
+		return "API Keys"
+	case HelpMenu:
+		return "Help"
+	case ExitMenu:
+		return "Exit"
+	case SettingsMenu:
+		return "Settings"
+	case ProvidersMenu:
+		return "Providers"
+	case ThemesMenu:
+		return "Themes"
+	default:
+		return "Menu"
+	}
 }
 
-// PromptsMenuEntries defines the prompts submenu options.
-var PromptsMenuEntries = MenuEntrySet{
-	{Text: "List Prompts", Description: "View all prompts"},
-	{Text: "Add Prompt", Description: "Create a new prompt"},
-	{Text: "Remove Prompt", Description: "Delete a prompt"},
-	{Text: "Set Default Prompt", Description: "Choose default prompt"},
-	{Text: "Back", Description: "Return to main menu", Next: MainMenu},
-}
-
-// ModelsMenuEntries defines the models submenu options.
-var ModelsMenuEntries = MenuEntrySet{
-	{Text: "List Models", Description: "View all models"},
-	{Text: "Add Model", Description: "Add a new model"},
-	{Text: "Remove Model", Description: "Delete a model"},
-	{Text: "Set Default Model", Description: "Choose default model"},
-	{Text: "Back", Description: "Return to main menu", Next: MainMenu},
-}
-
-// APIKeyMenuEntries defines the API key submenu options.
-var APIKeyMenuEntries = MenuEntrySet{
-	{Text: "List API Keys", Description: "View all API keys"},
-	{Text: "Add API Key", Description: "Add a new API key"},
-	{Text: "Remove API Key", Description: "Delete an API key"},
-	{Text: "Set Active API Key", Description: "Choose which key is active"},
-	{Text: "Test Active Key", Description: "Test the current key with a model"},
-	{Text: "Back", Description: "Return to main menu", Next: MainMenu},
-}
-
-// HelpMenuEntries defines the help submenu options.
-var HelpMenuEntries = MenuEntrySet{
-	{Text: "Show Controls", Description: "Display controls cheat sheet"},
-	{Text: "Show About", Description: "Display about information"},
-	{Text: "Back", Description: "Return to main menu", Next: MainMenu},
-}
-
-// ExitMenuEntries defines the exit menu (confirmation modal).
-var ExitMenuEntries = MenuEntrySet{
-	{Text: "Confirm Exit", Description: "Exit the application"},
-	{Text: "Cancel", Description: "Return to main menu", Next: MainMenu},
-}

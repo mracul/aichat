@@ -1,3 +1,4 @@
+package chat
 // state.go
 // State containers for composite chat view layout and region management
 
@@ -8,3 +9,4 @@ package chat
 type LayoutState struct {
 	// Add fields for width, height, ratios, etc. as needed
 }
+

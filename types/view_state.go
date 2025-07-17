@@ -1,30 +1,51 @@
-// types/view_state.go - Unified ViewState implementations for navigation stack
-// MIGRATION TARGET: legacy/gui.go (all menu, chat, modal state logic)
-
+package types
 package types
 
 import (
+	"aichat/interfaces"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ViewState interface: all view states (menus, modals, chats, etc.) implement this
-// OOP: Enables polymorphism and stack-based navigation
-// Design: Context and controller are injected for testability and decoupling
-
-type ViewState interface {
-	Type() ViewType
-	Update(msg tea.Msg) (tea.Model, tea.Cmd)
-	UpdateWithContext(msg tea.Msg, ctx Context, nav Controller) (tea.Model, tea.Cmd)
+// Renderable defines the rendering capability
+type Renderable interface {
 	View() string
+}
+
+// Updatable defines update logic
+type Updatable interface {
+	Update(msg tea.Msg) (tea.Model, tea.Cmd)
+	UpdateWithContext(msg tea.Msg, ctx interfaces.Context, nav interfaces.Controller) (tea.Model, tea.Cmd)
 	Init() tea.Cmd
-	// Added for navigation.go compatibility
-	IsMainMenu() bool
+}
+
+// Serializable defines state (un)marshalling
+type Serializable interface {
 	MarshalState() ([]byte, error)
-	ViewType() ViewType
 	UnmarshalState([]byte) error
+}
+
+// Navigable defines navigation-related methods
+type Navigable interface {
+	IsMainMenu() bool
+	Type() interfaces.ViewType
+	ViewType() interfaces.ViewType
+}
+
+// ViewState composes all the above
+type ViewState interface {
+	Renderable
+	Updatable
+	Serializable
+	Navigable
+}
+
+// ControlSetProvider defines context-specific controls for a view
+// Implement for views that provide dynamic controls (e.g., input, chat)
+type ControlSetProvider interface {
+	GetControlSet(ctx interfaces.Context) ControlSet
 }
 
 // MenuViewState: represents a menu or submenu view
@@ -35,61 +56,54 @@ type MenuViewState struct {
 	entries      MenuEntrySet
 	cursor       int
 	title        string
-	ctx          Context
-	nav          Controller
+	ctx          interfaces.Context
+	Nav          interfaces.Controller
 	WindowWidth  int // new: window width in cells
 	WindowHeight int // new: window height in cells
 }
 
-func NewMenuViewState(menuType MenuType, entries MenuEntrySet, title string, ctx Context, nav Controller) *MenuViewState {
+func NewMenuViewState(menuType MenuType, entries MenuEntrySet, title string, ctx interfaces.Context, nav interfaces.Controller) *MenuViewState {
 	return &MenuViewState{
 		menuType: menuType,
 		entries:  entries,
 		cursor:   0,
 		title:    title,
 		ctx:      ctx,
-		nav:      nav,
+		Nav:      nav,
 	}
 }
 
-func (mvs *MenuViewState) Type() ViewType { return MenuStateType }
+func (mvs *MenuViewState) Type() interfaces.ViewType { return interfaces.MenuStateType }
+
+// Exported getter for menuType
+func (mvs *MenuViewState) MenuType() MenuType { return mvs.menuType }
+
+// Exported getter for cursor
+func (mvs *MenuViewState) Cursor() int { return mvs.cursor }
 
 func (mvs *MenuViewState) Init() tea.Cmd { return nil }
 
 func (mvs *MenuViewState) View() string {
-	// ASCII art heading
-	ascii := ""
-	if mvs.WindowWidth > 0 {
-		ascii = centerString(menuAsciiArt(), mvs.WindowWidth)
-	} else {
-		ascii = menuAsciiArt()
+	w, h := mvs.WindowWidth, mvs.WindowHeight
+	if w == 0 {
+		w = 80
 	}
-	// Title
+	if h == 0 {
+		h = 24
+	}
+
+	// ASCII header (centered horizontally)
+	ascii := centerString(menuAsciiArt(), w)
+
+	// Title (centered in menu box)
 	titleColor := MenuTitleColorMap[mvs.menuType]
-	titleStyle := lipgloss.NewStyle().Bold(true).Align(lipgloss.Center).MarginBottom(1)
+	titleStyle := lipgloss.NewStyle().Bold(true).Align(lipgloss.Center)
 	if titleColor != "" {
 		titleStyle = titleStyle.Foreground(lipgloss.Color(titleColor))
 	}
 	title := titleStyle.Render(mvs.title)
-	if mvs.WindowWidth > 0 {
-		title = lipgloss.PlaceHorizontal(mvs.WindowWidth, lipgloss.Center, title)
-	}
-	// Dynamic menu box sizing
-	menuWidth := 300
-	menuHeight := 400
-	if mvs.WindowWidth > 0 {
-		w := int(float64(mvs.WindowWidth) * 0.382)
-		if w > menuWidth {
-			menuWidth = w
-		}
-	}
-	if mvs.WindowHeight > 0 {
-		h := int(float64(mvs.WindowHeight) * 0.618)
-		if h > menuHeight {
-			menuHeight = h
-		}
-	}
-	// Entries
+
+	// Entries (left-aligned, spaced)
 	var rendered []string
 	for i, entry := range mvs.entries {
 		style := lipgloss.NewStyle()
@@ -100,186 +114,122 @@ func (mvs *MenuViewState) View() string {
 			style = style.Faint(true)
 		}
 		text := entry.Text
+		desc := ""
 		if entry.Description != "" {
-			text += " — " + entry.Description
+			desc = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("245")).Render(" - " + entry.Description)
 		}
-		rendered = append(rendered, style.Render(text))
+		rendered = append(rendered, style.Render(text)+desc)
 	}
-	menuBox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2).Width(menuWidth).Height(menuHeight).Align(lipgloss.Center).Render(lipgloss.JoinVertical(lipgloss.Left, rendered...))
-	if mvs.WindowWidth > 0 {
-		menuBox = lipgloss.PlaceHorizontal(mvs.WindowWidth, lipgloss.Center, menuBox)
+
+	// Compose menu content: title centered, then blank line, then left-aligned entries
+	menuContentBlock := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		"",
+		lipgloss.JoinVertical(lipgloss.Left, rendered...),
+	)
+
+	// Calculate menu box dimensions
+	menuWidth := int(float64(w) * 3.0 / 8.0)
+	if menuWidth < 40 {
+		menuWidth = 40
 	}
-	// Control hints (left-aligned, beneath menu box)
+	contentHeight := len(rendered) + 2 // +2 for title and blank line
+	minHeight := contentHeight + 2     // +2 for top/bottom padding
+	proportionalHeight := int(float64(h) * 4.0 / 6.0)
+	menuHeight := proportionalHeight
+	if menuHeight < minHeight {
+		menuHeight = minHeight
+	}
+	if menuHeight > minHeight+6 { // Cap extra space to 6 lines beyond content
+		menuHeight = minHeight + 6
+	}
+
+	// Vertically center the menu content inside the menu box
+	menuContentBlock = lipgloss.Place(menuWidth-4, menuHeight-2, lipgloss.Center, lipgloss.Center, menuContentBlock)
+
+	menuBoxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Padding(1, 2).
+		MarginTop(1).
+		MarginBottom(1).
+		Width(menuWidth).
+		Height(menuHeight).
+		Align(lipgloss.Left)
+
+	menuBox := menuBoxStyle.Render(menuContentBlock)
+	menuBox = lipgloss.PlaceHorizontal(w, lipgloss.Center, menuBox)
+
+	// Control info as a single line, left-aligned below menu box, with margin
 	meta := MenuMetas[mvs.menuType]
 	controls := ControlInfoMap[meta.ControlInfoType]
-	var controlLines []string
-	for _, line := range controls.Lines {
-		controlLines = append(controlLines, lipgloss.NewStyle().Faint(true).Render(line))
+	controlLine := ""
+	if len(controls.Lines) > 0 {
+		controlLine = controls.Lines[0]
 	}
-	controlInfo := lipgloss.JoinVertical(lipgloss.Left, controlLines...)
-	// Compose: ASCII heading, title, menu box, control info (beneath)
-	content := lipgloss.JoinVertical(
-		lipgloss.Center,
+	controlInfo := lipgloss.NewStyle().Faint(true).Width(menuWidth).Align(lipgloss.Left).MarginTop(1).Render(controlLine)
+	leftPad := (w - menuWidth) / 2
+	controlInfoBlock := lipgloss.PlaceHorizontal(w, lipgloss.Left, strings.Repeat(" ", leftPad)+controlInfo)
+
+	// Compose the group as a vertical block (ascii, menuBox, controlInfoBlock)
+	group := lipgloss.JoinVertical(lipgloss.Top,
 		ascii,
-		title,
 		menuBox,
-		controlInfo,
+		controlInfoBlock,
 	)
-	w, h := mvs.WindowWidth, mvs.WindowHeight
-	if w == 0 {
-		w = 800
-	}
-	if h == 0 {
-		h = 600
-	}
-	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, content)
+
+	// Center the group vertically and horizontally in the available space
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, group)
 }
 
 // Bubble Tea compatibility: wraps OOP-style Update
 func (mvs *MenuViewState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return mvs.UpdateWithContext(msg, mvs.ctx, mvs.nav)
+	return mvs.UpdateWithContext(msg, mvs.ctx, mvs.Nav)
 }
 
 // OOP-style update
-func (mvs *MenuViewState) UpdateWithContext(msg tea.Msg, ctx Context, nav Controller) (tea.Model, tea.Cmd) {
+func (mvs *MenuViewState) UpdateWithContext(msg tea.Msg, ctx interfaces.Context, nav interfaces.Controller) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
-			if mvs.cursor > 0 {
-				mvs.cursor--
-			}
+			mvs.MoveCursorUp()
 		case "down", "j":
-			if mvs.cursor < len(mvs.entries)-1 {
-				mvs.cursor++
-			}
+			mvs.MoveCursorDown()
 		case "enter":
 			entry := mvs.entries[mvs.cursor]
 			if entry.Disabled {
 				return mvs, nil
 			}
-			// Always call Action if present
 			if entry.Action != nil {
 				if err := entry.Action(ctx, nav); err != nil {
 					nav.ShowModal("error", err.Error())
 				}
-				// If Action handled navigation, do not also push Next
 				return mvs, nil
 			}
-			// If no Action, but Next is set, navigate to the next menu
 			if entry.Next != 0 {
 				nav.Push(NewMenuViewState(entry.Next, getMenuEntries(entry.Next), menuTypeToString(entry.Next), ctx, nav))
 			}
-		case "esc", "q":
-			if nav.CanPop() {
+		case "esc":
+			if mvs.IsMainMenu() {
+				nav.Pop()
+			} else if nav.CanPop() {
 				nav.Pop()
 			}
+		case "ctrl+q":
+			nav.Pop()
 		}
 	}
 	return mvs, nil
 }
 
-func (mvs *MenuViewState) IsMainMenu() bool              { return mvs.menuType == MainMenu }
-func (mvs *MenuViewState) MarshalState() ([]byte, error) { return nil, nil }
-func (mvs *MenuViewState) ViewType() ViewType            { return MenuStateType }
-func (mvs *MenuViewState) UnmarshalState([]byte) error   { return nil }
+// Ensure MenuViewState implements ControlSetProvider
+var _ ControlSetProvider = (*MenuViewState)(nil)
 
-func (mvs *MenuViewState) Resize(w, h int) {
-	if w < 800 {
-		w = 800
-	}
-	if h < 600 {
-		h = 600
-	}
-	mvs.WindowWidth = w
-	mvs.WindowHeight = h
+// GetControlSet returns the context-specific controls for the menu
+func (mvs *MenuViewState) GetControlSet(ctx interfaces.Context) ControlSet {
+	// For now, always return DefaultMenuControlSet; can be extended for context
+	return DefaultMenuControlSet
 }
-
-// ChatViewState: compatible with tea.Model and OOP-style update
-// (Stub for demonstration)
-type ChatViewState struct {
-	ChatTitle string
-	Messages  []string // TODO: Replace with message structs
-	Streaming bool
-	ctx       Context
-	nav       Controller
-}
-
-func (c *ChatViewState) Type() ViewType { return ChatStateType }
-func (c *ChatViewState) Init() tea.Cmd  { return nil }
-func (c *ChatViewState) View() string   { return "[Chat: " + c.ChatTitle + "]" }
-func (c *ChatViewState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return c.UpdateWithContext(msg, c.ctx, c.nav)
-}
-func (c *ChatViewState) UpdateWithContext(msg tea.Msg, ctx Context, nav Controller) (tea.Model, tea.Cmd) {
-	// TODO: Implement chat update logic
-	return c, nil
-}
-
-func (c *ChatViewState) IsMainMenu() bool              { return false }
-func (c *ChatViewState) MarshalState() ([]byte, error) { return nil, nil }
-func (c *ChatViewState) ViewType() ViewType            { return ChatStateType }
-func (c *ChatViewState) UnmarshalState([]byte) error   { return nil }
-
-// ModalViewState: compatible with tea.Model and OOP-style update
-// (Stub for demonstration)
-type ModalViewState struct {
-	ModalType string
-	Content   string
-	ctx       Context
-	nav       Controller
-}
-
-func (m *ModalViewState) Type() ViewType { return ModalStateType }
-func (m *ModalViewState) Init() tea.Cmd  { return nil }
-func (m *ModalViewState) View() string   { return "[Modal: " + m.ModalType + "] " + m.Content }
-func (m *ModalViewState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return m.UpdateWithContext(msg, m.ctx, m.nav)
-}
-func (m *ModalViewState) UpdateWithContext(msg tea.Msg, ctx Context, nav Controller) (tea.Model, tea.Cmd) {
-	// TODO: Implement modal update logic
-	return m, nil
-}
-
-func (m *ModalViewState) IsMainMenu() bool              { return false }
-func (m *ModalViewState) MarshalState() ([]byte, error) { return nil, nil }
-func (m *ModalViewState) ViewType() ViewType            { return ModalStateType }
-func (m *ModalViewState) UnmarshalState([]byte) error   { return nil }
-
-// Helper: get menu entries for a given MenuType
-func getMenuEntries(menuType MenuType) MenuEntrySet {
-	switch menuType {
-	case MainMenu:
-		return MainMenuEntries
-	case ChatsMenu:
-		return ChatsMenuEntries
-	case FavoritesMenu:
-		return FavoritesMenuEntries
-	case PromptsMenu:
-		return PromptsMenuEntries
-	case ModelsMenu:
-		return ModelsMenuEntries
-	case APIKeyMenu:
-		return APIKeyMenuEntries
-	case HelpMenu:
-		return HelpMenuEntries
-	case ExitMenu:
-		return ExitMenuEntries
-	case SettingsMenu:
-		return SettingsMenuEntries
-	case ProvidersMenu:
-		return ProvidersMenuEntries
-	case ThemesMenu:
-		return ThemesMenuEntries
-	default:
-		return nil
-	}
-}
-
-// QuitAppMsg is sent when the user confirms quitting the app
-// Used by quit confirmation modal
-
-type QuitAppMsg struct{}
 
 // menuTypeToString returns a human-readable menu name (local helper)
 func menuTypeToString(mt MenuType) string {
@@ -311,12 +261,12 @@ func menuTypeToString(mt MenuType) string {
 
 // menuAsciiArt returns the ASCII art for the menu header.
 func menuAsciiArt() string {
-	return `  
+	return `
   █████╗ ██╗ ██████╗██╗  ██╗ █████╗ ████████╗
  ██╔══██╗██║██╔════╝██║  ██║██╔══██╗╚══██╔══╝
- ███████║██║██║     ███████║███████║   ██║   
- ██╔══██║██║██║     ██╔══██║██╔══██║   ██║   
- ██║  ██║██║╚██████╗██║  ██║██║  ██║   ██║   
+ ███████║██║██║     ███████║███████║   ██║
+ ██╔══██║██║██║     ██╔══██║██╔══██║   ██║
+ ██║  ██║██║╚██████╗██║  ██║██║  ██║   ██║
  ╚═╝  ╚═╝╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   `
 }
 
@@ -329,3 +279,41 @@ func centerString(s string, width int) string {
 	}
 	return lipgloss.JoinVertical(lipgloss.Center, centered...)
 }
+
+func (mvs *MenuViewState) Entries() MenuEntrySet {
+	return mvs.entries
+}
+
+// Add or update navigation logic to cycle cursor
+func (mvs *MenuViewState) MoveCursorUp() {
+	if len(mvs.entries) == 0 {
+		return
+	}
+	if mvs.cursor == 0 {
+		mvs.cursor = len(mvs.entries) - 1
+	} else {
+		mvs.cursor--
+	}
+}
+
+func (mvs *MenuViewState) MoveCursorDown() {
+	if len(mvs.entries) == 0 {
+		return
+	}
+	if mvs.cursor == len(mvs.entries)-1 {
+		mvs.cursor = 0
+	} else {
+		mvs.cursor++
+	}
+}
+
+// Ensure IsMainMenu is exported and present
+func (mvs *MenuViewState) IsMainMenu() bool { return mvs.menuType == MainMenu }
+
+// Add MarshalState and UnmarshalState to fully implement ViewState
+func (mvs *MenuViewState) MarshalState() ([]byte, error) { return nil, nil }
+func (mvs *MenuViewState) UnmarshalState([]byte) error   { return nil }
+
+// Add ViewType to fully implement ViewState
+func (mvs *MenuViewState) ViewType() interfaces.ViewType { return interfaces.MenuStateType }
+

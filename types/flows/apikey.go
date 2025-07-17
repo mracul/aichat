@@ -1,3 +1,4 @@
+package flows
 // apikey.go
 // Type definitions for API key-related flows (add, remove, set active, test, list)
 
@@ -38,3 +39,4 @@ type ListAPIKeysFlow struct {
 	ListModal types.ViewState
 	Strategy  FlowStrategy
 }
+

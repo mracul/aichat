@@ -1,4 +1,5 @@
 package navigation
+package navigation
 
 import "aichat/types"
 
@@ -16,3 +17,4 @@ type NavigationMsg struct {
 	Action NavigationAction
 	Target types.ViewState // Only for PushAction
 }
+

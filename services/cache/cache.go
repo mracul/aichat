@@ -1,3 +1,4 @@
+package cache
 // Package cache provides in-memory caching for application data with file modification detection.
 package cache
 
@@ -415,3 +416,4 @@ func (cm *CacheManager) loadAPIKeysFromFile(filePath string) ([]types.APIKey, er
 
 	return config.Keys, nil
 }
+

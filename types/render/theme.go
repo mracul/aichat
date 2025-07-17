@@ -1,3 +1,4 @@
+package render
 // theme.go
 // Theme type for TUI color schemes, designed for Bubble Tea/lipgloss
 
@@ -26,3 +27,4 @@ type Theme struct {
 // ThemeMap maps a theme key (e.g., "menu", "notice") to a Theme
 // This allows per-component theming
 type ThemeMap map[string]Theme
+

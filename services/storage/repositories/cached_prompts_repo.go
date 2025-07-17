@@ -1,3 +1,4 @@
+package repositories
 // Package repositories provides cached repository implementations for persistent data storage.
 package repositories
 
@@ -177,3 +178,4 @@ func (r *CachedPromptRepository) GetStats() map[string]cache.CacheStats {
 func (r *CachedPromptRepository) saveToFile(prompts []flows.Prompt) error {
 	return flows.SavePromptsToFile(prompts, r.filePath)
 }
+

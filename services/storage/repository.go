@@ -1,3 +1,4 @@
+package storage
 // Package storage provides repository interfaces for persistent data storage.
 package storage
 
@@ -31,3 +32,4 @@ type ModelRepository interface {
 	Save(model *types.Model) error
 	Delete(name string) error
 }
+

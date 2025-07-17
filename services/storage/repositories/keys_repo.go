@@ -1,4 +1,5 @@
 package repositories
+package repositories
 
 import (
 	"encoding/json"
@@ -78,3 +79,4 @@ func (r *APIKeyRepository) SetActive(title string) error {
 	}
 	return r.SaveAll(keys)
 }
+

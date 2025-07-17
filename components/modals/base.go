@@ -1,8 +1,7 @@
+package modals
 // base.go - Contains the BaseModal struct and ModalOption/CloseSelf types for reusable modal dialogs in the Bubble Tea UI.
 
 package modals
-
-import "github.com/charmbracelet/lipgloss"
 
 // ModalOption represents a selectable option in a modal dialog.
 type ModalOption struct {
@@ -15,14 +14,13 @@ type CloseSelfFunc func()
 
 // BaseModal is the base struct for all modal dialogs, containing message, options, close logic, and selection state.
 type BaseModal struct {
-	Message   string
-	Options   []ModalOption
-	CloseSelf CloseSelfFunc
-	Selected  int
-	// [MIGRATION] Use RenderStrategy and Theme for all rendering in BaseModal.
-	// Replace direct lipgloss.NewStyle() and hardcoded colors with ApplyStrategy and ThemeMap lookups.
-	// Add a ThemeMap field to BaseModal and use it in View().
-	ThemeMap map[string]string
+	ModalRenderConfig
+	Message      string
+	Options      []ModalOption
+	CloseSelf    CloseSelfFunc
+	Selected     int
+	RegionWidth  int
+	RegionHeight int
 }
 
 // Init initializes the modal (Bubble Tea compatibility).
@@ -31,12 +29,13 @@ func (m *BaseModal) Init() {}
 // Update handles Bubble Tea messages for the modal.
 func (m *BaseModal) Update(msg interface{}) {}
 
-// View renders the modal UI as a string, centered in the given region (width, height).
-// All modals should use this pattern for region-aware rendering.
-func (m *BaseModal) View(regionWidth, regionHeight int) string {
-	// [MIGRATION] Use RenderStrategy and Theme for all rendering in BaseModal.
-	// Replace direct lipgloss.NewStyle() and hardcoded colors with ApplyStrategy and ThemeMap lookups.
-	// Add a ThemeMap field to BaseModal and use it in View().
-	content := lipgloss.NewStyle().Bold(true).Render(m.Message)
-	return lipgloss.Place(regionWidth, regionHeight, lipgloss.Center, lipgloss.Center, content)
+// ViewRegion renders the modal content using the shared modal rendering utility.
+func (m *BaseModal) ViewRegion(content string, strategyKey string) string {
+	return RenderModalBox(content, m.ModalRenderConfig, strategyKey)
 }
+
+// RenderContentWithStrategy renders content using the given strategy key.
+func (m *BaseModal) RenderContentWithStrategy(content string, strategyKey string) string {
+	return RenderModalBox(content, m.ModalRenderConfig, strategyKey)
+}
+

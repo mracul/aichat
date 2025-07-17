@@ -1,4 +1,5 @@
 package types
+package types
 
 import (
 	"encoding/json"
@@ -7,6 +8,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// Event is a generic event type for observer/command patterns
+type Event struct {
+	Type    string
+	Payload interface{}
+}
 
 // ModalType is a type alias for modal identifiers (e.g., confirmation, input, etc.)
 type ModalType string
@@ -142,6 +149,26 @@ var DefaultControlSet = ControlSet{
 	},
 }
 
+// DefaultMenuControlSet for menus
+var DefaultMenuControlSet = ControlSet{
+	Controls: []ControlType{
+		{Name: "Up", Key: tea.KeyUp, Action: nil},
+		{Name: "Down", Key: tea.KeyDown, Action: nil},
+		{Name: "Enter", Key: tea.KeyEnter, Action: nil},
+		{Name: "Esc", Key: tea.KeyEsc, Action: nil},
+		{Name: "Quit", Key: tea.KeyCtrlQ, Action: nil},
+	},
+}
+
+// CombineControlSets merges multiple ControlSets into one
+func CombineControlSets(sets ...ControlSet) ControlSet {
+	var combined ControlSet
+	for _, set := range sets {
+		combined.Controls = append(combined.Controls, set.Controls...)
+	}
+	return combined
+}
+
 // APIKey represents a single API key with a title, key, URL, and active status.
 type APIKey struct {
 	Title  string `json:"title"`
@@ -189,3 +216,4 @@ func SaveModelsToFile(models []Model, filePath string) error {
 	}
 	return os.WriteFile(filePath, data, 0644)
 }
+

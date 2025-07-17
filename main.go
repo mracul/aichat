@@ -1,11 +1,8 @@
-// main.go - Entry point for the AI CLI application
-// This file handles environment setup, configuration loading, and launches the unified application
-// The unified app model integrates responsive resizing, ANSI optimization, and proper navigation
-
+package main
 package main
 
 import (
-	"aichat/app"
+	"aichat/types"
 	"aichat/services/storage"
 	"log/slog"
 	"os"
@@ -15,37 +12,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// =====================================================================================
-// 🚀 Application Entry Point
-// =====================================================================================
-
 func main() {
-	// Initialize logging
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)
-
 	logger.Info("Starting AI CLI application", "version", "1.0.0")
 
-	// Create navigation storage directly
 	navStorage := storage.NewNavigationStorage(".config")
+	cfg := app.DefaultAppConfig()
+	appModel := app.NewUnifiedAppModel(cfg, navStorage, logger)
 
-	// Create and run the unified application (optimized mode by default)
-	cfg := config.DefaultAppConfig()
-	_ = cfg // Currently not used by NewAppModel, but available for future use
-	appModel := app.NewAppModel(navStorage, nil, "")
 	program := tea.NewProgram(appModel, tea.WithAltScreen(), tea.WithMouseCellMotion())
-
-	// Set up graceful shutdown
 	setupGracefulShutdown(program, logger)
 
-	// Run the application
 	if _, err := program.Run(); err != nil {
 		logger.Error("Application failed", "error", err)
 		os.Exit(1)
 	}
-
 	logger.Info("Application completed successfully")
 }
 
@@ -67,3 +51,4 @@ func setupGracefulShutdown(program *tea.Program, logger *slog.Logger) {
 		program.Quit()
 	}()
 }
+

@@ -1,3 +1,4 @@
+package flows
 // models.go
 // Type definitions for models-related flows (add, remove, set default, list)
 
@@ -32,3 +33,4 @@ type ListModelsFlow struct {
 	ListModal types.ViewState
 	Strategy  FlowStrategy
 }
+

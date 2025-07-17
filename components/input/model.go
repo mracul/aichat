@@ -1,94 +1,27 @@
+package input
 // model.go - Defines the InputModel struct for the chat input box, supporting focus, clipboard, shortcuts, and cursor management.
 // Integrates with AppModel and ChatModel for message sending and input focus control.
 
 package input
 
 import (
+	"aichat/types"
+	"aichat/types/render"
 	"strings"
-
-	"aichat/src/types"
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// InputModel manages the chat input box state and logic.
+// InputModel struct for the chat input box
 type InputModel struct {
-	Buffer   string           // Current input buffer
-	Cursor   int              // Cursor position in buffer
-	Focused  bool             // Whether the input box is focused
-	Quitting bool             // Whether input is quitting (for modal/exit)
-	Width    int              // Render width
-	Height   int              // Render height
-	Message  string           // Optional error/info message
-	Controls types.ControlSet // ControlSet for this input
-}
-
-// NewInputModel constructs a new InputModel.
-func NewInputModel(width, height int) *InputModel {
-	m := &InputModel{
-		Buffer:  "",
-		Cursor:  0,
-		Focused: true,
-		Width:   width,
-		Height:  height,
-	}
-	m.Controls = types.ControlSet{
-		Controls: []types.ControlType{
-			{
-				Name: "Left", Key: tea.KeyLeft,
-				Action: func() bool {
-					if m.Cursor > 0 {
-						m.Cursor--
-					}
-					return true
-				},
-			},
-			{
-				Name: "Right", Key: tea.KeyRight,
-				Action: func() bool {
-					if m.Cursor < len(m.Buffer) {
-						m.Cursor++
-					}
-					return true
-				},
-			},
-			{
-				Name: "Backspace", Key: tea.KeyBackspace,
-				Action: func() bool {
-					if m.Cursor > 0 && len(m.Buffer) > 0 {
-						m.Buffer = m.Buffer[:m.Cursor-1] + m.Buffer[m.Cursor:]
-						m.Cursor--
-					}
-					return true
-				},
-			},
-			{
-				Name: "Ctrl+C", Key: tea.KeyCtrlC,
-				Action: func() bool { _ = clipboard.WriteAll(m.Buffer); return true },
-			},
-			{
-				Name: "Ctrl+V", Key: tea.KeyCtrlV,
-				Action: func() bool {
-					paste, err := clipboard.ReadAll()
-					if err == nil && paste != "" {
-						m.Buffer = m.Buffer[:m.Cursor] + paste + m.Buffer[m.Cursor:]
-						m.Cursor += len(paste)
-					}
-					return true
-				},
-			},
-			{
-				Name: "Enter", Key: tea.KeyEnter,
-				Action: func() bool { m.Focused = false; return true },
-			},
-			{
-				Name: "Esc", Key: tea.KeyEsc,
-				Action: func() bool { m.Quitting = true; return true },
-			},
-		},
-	}
-	return m
+	Buffer   string
+	Cursor   int
+	Focused  bool
+	Message  string
+	Controls types.ControlSet
+	ThemeMap render.ThemeMap
+	Strategy render.RenderStrategy
 }
 
 // Init initializes the input model (Bubble Tea compatibility).
@@ -182,10 +115,16 @@ func (m *InputModel) View() string {
 	if m.Cursor >= 0 && m.Cursor <= len(input) {
 		input = input[:m.Cursor] + "|" + input[m.Cursor:]
 	}
-	return "Input: " + strings.ReplaceAll(input, "\n", "\\n") + m.Message
+	content := "Input: " + strings.ReplaceAll(input, "\n", "\\n") + m.Message
+	if m.ThemeMap != nil {
+		theme := m.ThemeMap[m.Strategy.ThemeKey]
+		return render.ApplyStrategy(content, m.Strategy, theme)
+	}
+	return content
 }
 
 // GetControlSet returns the current control set for the input model
 func (m *InputModel) GetControlSet() interface{} {
 	return m.Controls
 }
+

@@ -1,4 +1,9 @@
 package types
+package types
+
+import (
+	"aichat/interfaces"
+)
 
 type MenuType int
 
@@ -16,7 +21,7 @@ const (
 	ThemesMenu    // Added for settings submenu
 )
 
-type MenuAction func(ctx Context, nav Controller) error
+type MenuAction func(ctx interfaces.Context, nav interfaces.Controller) error
 
 type MenuEntry struct {
 	Text        string
@@ -28,3 +33,4 @@ type MenuEntry struct {
 }
 
 type MenuEntrySet []MenuEntry
+

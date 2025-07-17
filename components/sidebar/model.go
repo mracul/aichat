@@ -1,3 +1,4 @@
+package sidebar
 // components/sidebar/model.go - SidebarTabsModel using vendored soft-serve tabs implementation
 
 package sidebar
@@ -47,3 +48,4 @@ func (m *SidebarTabsModel) ActiveTab() int {
 func (m *SidebarTabsModel) TabNames() []string {
 	return m.Tabs.TabNames()
 }
+

@@ -1,3 +1,4 @@
+package modals
 // ai_key_test.go - Modal for testing AI API keys with spinner and result
 // Returns a key:value pair on completion for flows to append to their data
 
@@ -95,3 +96,4 @@ func (m *AIKeyTestModal) View() string {
 //     // result["ai_key_test_result"] contains {success, code, msg}
 //     // Flows can append this to their data on success
 // })
+

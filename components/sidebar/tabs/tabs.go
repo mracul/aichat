@@ -1,10 +1,12 @@
 package tabs
+package tabs
 
 import (
 	"strings"
 
+	"aichat/types/render"
+
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // SelectTabMsg is a message that contains the index of the tab to select.
@@ -17,12 +19,11 @@ type ActiveTabMsg int
 type Tabs struct {
 	tabs         []string
 	activeTab    int
-	TabSeparator lipgloss.Style
-	TabInactive  lipgloss.Style
-	TabActive    lipgloss.Style
-	TabDot       lipgloss.Style
+	TabSeparator string
 	UseDot       bool
 	Width        int
+	ThemeMap     render.ThemeMap
+	Strategy     render.RenderStrategy
 }
 
 // New creates a new Tabs component with default styles.
@@ -30,12 +31,11 @@ func New(tabNames []string) *Tabs {
 	return &Tabs{
 		tabs:         tabNames,
 		activeTab:    0,
-		TabSeparator: lipgloss.NewStyle().Foreground(lipgloss.Color("#444")).SetString(" | "),
-		TabInactive:  lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Padding(0, 1),
-		TabActive:    lipgloss.NewStyle().Foreground(lipgloss.Color("#FFF")).Background(lipgloss.Color("#333")).Bold(true).Padding(0, 1),
-		TabDot:       lipgloss.NewStyle().Foreground(lipgloss.Color("#00F")).SetString("• "),
+		TabSeparator: " | ",
 		UseDot:       false,
 		Width:        0,
+		ThemeMap:     nil,                     // Should be set after construction
+		Strategy:     render.RenderStrategy{}, // Should be set after construction
 	}
 }
 
@@ -77,24 +77,29 @@ func (t *Tabs) View() string {
 	s := strings.Builder{}
 	sep := t.TabSeparator
 	for i, tab := range t.tabs {
-		style := t.TabInactive
-		prefix := "  "
+		style := t.ThemeMap[t.Strategy.ThemeKey]
 		if i == t.activeTab {
-			style = t.TabActive
-			if t.UseDot {
-				prefix = t.TabDot.Render("")
+			style = render.Theme{
+				TextColor:   "#fff",
+				BgColor:     "#333",
+				BorderColor: "#f90",
 			}
+		}
+		prefix := "  "
+		if t.UseDot && i == t.activeTab {
+			prefix = "• "
 		}
 		if t.UseDot {
 			s.WriteString(prefix)
 		}
-		s.WriteString(style.Render(tab))
+		styled := render.ApplyStrategy(tab, t.Strategy, style)
+		s.WriteString(styled)
 		if i != len(t.tabs)-1 {
-			s.WriteString(sep.String())
+			s.WriteString(sep)
 		}
 	}
 	if t.Width > 0 {
-		return lipgloss.NewStyle().MaxWidth(t.Width).Render(s.String())
+		return render.ApplyStrategy(s.String(), t.Strategy, t.ThemeMap[t.Strategy.ThemeKey])
 	}
 	return s.String()
 }
@@ -119,3 +124,4 @@ func (t *Tabs) ActiveTab() int {
 func (t *Tabs) TabNames() []string {
 	return t.tabs
 }
+

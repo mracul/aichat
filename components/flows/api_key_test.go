@@ -1,3 +1,4 @@
+package flows
 // api_key_test.go
 // API key test flow modal for multi-step API key validation
 
@@ -23,3 +24,4 @@ func (f *APIKeyTestFlow) UpdateWithContext(msg tea.Msg, ctx types.Context, nav t
 	// Stub for API key test step logic
 	return f, nil
 }
+

@@ -1,3 +1,4 @@
+package flows
 // prompts.go
 // Type definitions for prompts-related flows (add, remove, set default, list)
 
@@ -52,3 +53,4 @@ func SavePromptsToFile(prompts []Prompt, filePath string) error {
 	}
 	return os.WriteFile(filePath, data, 0644)
 }
+

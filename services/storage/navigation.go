@@ -1,3 +1,4 @@
+package storage
 // services/storage/navigation.go - Navigation state persistence
 // MIGRATION TARGET: refactoring.md (storage service integration)
 
@@ -39,3 +40,4 @@ func atomicWrite(path string, data []byte) error {
 	}
 	return os.Rename(tmp, path)
 }
+

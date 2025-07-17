@@ -1,4 +1,5 @@
 package main
+package main
 
 import (
 	"bufio"
@@ -167,3 +168,4 @@ func promptPromptSelection(reader *bufio.Reader) (string, string, error) {
 	selected := prompts[idx-1]
 	return selected.Name, selected.Content, nil
 }
+

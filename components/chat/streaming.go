@@ -1,3 +1,4 @@
+package chat
 // streaming.go - Per-chat streaming worker for OpenRouter API
 // Handles streaming, cancellation, and updates to chat state.
 
@@ -139,3 +140,4 @@ func (w *StreamWorker) streamMessage(ctx context.Context, userMsg string) {
 		}
 	}
 }
+

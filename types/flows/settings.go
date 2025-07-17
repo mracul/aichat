@@ -1,3 +1,4 @@
+package flows
 // settings.go
 // Type definitions for settings-related flows
 
@@ -12,3 +13,4 @@ type SettingsFlow struct {
 	NoticeModal   types.ViewState
 	Strategy      FlowStrategy
 }
+

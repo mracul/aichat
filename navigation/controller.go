@@ -1,4 +1,5 @@
 package navigation
+package navigation
 
 import (
 	"aichat/types"
@@ -102,3 +103,4 @@ func (nc *ControllerImpl) Resize(w, h int) {
 		}
 	}
 }
+

@@ -1,4 +1,5 @@
 package navigation
+package navigation
 
 import (
 	"aichat/types"
@@ -61,3 +62,4 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *AppModel) View() string {
 	return m.Stack.Top().View()
 }
+

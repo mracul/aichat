@@ -1,8 +1,9 @@
+package dialogs
 // help.go - Contains HelpModal for displaying help or info content in a modal dialog in the Bubble Tea UI.
 
 package dialogs
 
-import "github.com/charmbracelet/lipgloss"
+import "aichat/components/modals"
 
 // HelpModal is a reusable modal for displaying help or info content.
 type HelpModal struct {
@@ -10,9 +11,7 @@ type HelpModal struct {
 	CloseSelf    func() // Callback to restore previous state
 	RegionWidth  int    // Last-known or intended region width for rendering
 	RegionHeight int    // Last-known or intended region height for rendering
-	// [MIGRATION] Use RenderStrategy and Theme for all rendering in HelpModal.
-	// Replace direct lipgloss.NewStyle() and hardcoded colors with ApplyStrategy and ThemeMap lookups.
-	// Add a ThemeMap field to HelpModal and use it in ViewRegion().
+	modals.ModalRenderConfig
 }
 
 // Init initializes the modal (Bubble Tea compatibility).
@@ -28,9 +27,6 @@ func (m *HelpModal) View() string {
 
 // ViewRegion renders the help/info modal UI as a string, centered in the given region (width, height).
 func (m *HelpModal) ViewRegion(regionWidth, regionHeight int) string {
-	// [MIGRATION] Use RenderStrategy and Theme for all rendering in HelpModal.
-	// Replace direct lipgloss.NewStyle() and hardcoded colors with ApplyStrategy and ThemeMap lookups.
-	// Add a ThemeMap field to HelpModal and use it in ViewRegion().
-	content := lipgloss.NewStyle().Padding(1, 2).Render(m.Content)
-	return lipgloss.Place(regionWidth, regionHeight, lipgloss.Center, lipgloss.Center, content)
+	return m.RenderContentWithStrategy(m.Content, "modalBox")
 }
+

@@ -1,4 +1,5 @@
 package main
+package main
 
 import (
 	"aichat/services/storage/repositories"
@@ -14,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"aichat/errors"
 )
 
 // Directory constants
@@ -66,7 +69,7 @@ func prependSystemPromptLocal(messages []types.Message, systemPrompt types.Messa
 func loadAPIKeys() (*types.APIKeysConfig, error) {
 	keys, err := apiKeyRepo.GetAll()
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStorageError("utils.go", "failed to load API keys", err)
 	}
 	return &types.APIKeysConfig{Keys: keys}, nil
 }
@@ -80,28 +83,28 @@ func saveAPIKeys(config *types.APIKeysConfig) error {
 func getActiveAPIKey() (string, error) {
 	keys, err := apiKeyRepo.GetAll()
 	if err != nil {
-		return "", err
+		return "", errors.NewStorageError("utils.go", "failed to get active API key", err)
 	}
 	for _, key := range keys {
 		if key.Active {
 			return key.Key, nil
 		}
 	}
-	return "", fmt.Errorf("no active API key found")
+	return "", errors.NewConfigurationError("utils.go", "no active API key found")
 }
 
 // getActiveAPIKeyAndURL returns the currently active API key and its URL from the repository, or an error if not found.
 func getActiveAPIKeyAndURL() (string, string, error) {
 	keys, err := apiKeyRepo.GetAll()
 	if err != nil {
-		return "", "", err
+		return "", "", errors.NewStorageError("utils.go", "failed to get active API key and URL", err)
 	}
 	for _, key := range keys {
 		if key.Active {
 			return key.Key, key.URL, nil
 		}
 	}
-	return "", "", fmt.Errorf("no active API key found")
+	return "", "", errors.NewConfigurationError("utils.go", "no active API key found")
 }
 
 // readAPIKey returns the active API key from the multi-key system, or error if not found.
@@ -197,20 +200,12 @@ func TestAPIKeyWithModel(model string) string {
 func ensureEnvironment() error {
 	// Create .util directory
 	if err := os.MkdirAll(utilPath(), 0755); err != nil {
-		return &AppError{
-			Op:      "create util directory",
-			Err:     err,
-			Message: "failed to create utility directory",
-		}
+		return errors.NewStorageError("utils.go", "failed to create util directory", err)
 	}
 
 	// Create chats directory
 	if err := os.MkdirAll(chatsPath(), 0755); err != nil {
-		return &AppError{
-			Op:      "create chats directory",
-			Err:     err,
-			Message: "failed to create chats directory",
-		}
+		return errors.NewStorageError("utils.go", "failed to create chats directory", err)
 	}
 
 	// DO NOT create api_keys.json here; onboarding flow will handle it
@@ -218,22 +213,14 @@ func ensureEnvironment() error {
 	// Ensure models file exists
 	if _, err := os.Stat(modelsFilePath()); os.IsNotExist(err) {
 		if err := initializeModelsFile(); err != nil {
-			return &AppError{
-				Op:      "create models file",
-				Err:     err,
-				Message: "failed to create models file",
-			}
+			return errors.NewStorageError("utils.go", "failed to create models file", err)
 		}
 	}
 
 	// Ensure prompts file exists
 	if _, err := os.Stat(promptsConfigPath()); os.IsNotExist(err) {
 		if err := ensurePromptsConfig(); err != nil {
-			return &AppError{
-				Op:      "create prompts file",
-				Err:     err,
-				Message: "failed to create prompts file",
-			}
+			return errors.NewStorageError("utils.go", "failed to create prompts file", err)
 		}
 	}
 
@@ -247,11 +234,7 @@ func promptAndSaveAPIKey(reader *bufio.Reader) error {
 	fmt.Print("Enter a title for this API key: ")
 	title, err := reader.ReadString('\n')
 	if err != nil {
-		return &AppError{
-			Op:      "read API key title",
-			Err:     err,
-			Message: "failed to read API key title from input",
-		}
+		return errors.NewValidationError("failed to read API key title from input", err.Error())
 	}
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -261,30 +244,18 @@ func promptAndSaveAPIKey(reader *bufio.Reader) error {
 	fmt.Print("Enter your OpenRouter API key: ")
 	key, err := reader.ReadString('\n')
 	if err != nil {
-		return &AppError{
-			Op:      "read API key input",
-			Err:     err,
-			Message: "failed to read API key from input",
-		}
+		return errors.NewValidationError("failed to read API key from input", err.Error())
 	}
 
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return &AppError{
-			Op:      "validate API key",
-			Err:     fmt.Errorf("empty key"),
-			Message: "API key cannot be empty",
-		}
+		return errors.NewValidationError("empty key", "empty key")
 	}
 
 	fmt.Print("Enter the URL for this API key: ")
 	url, err := reader.ReadString('\n')
 	if err != nil {
-		return &AppError{
-			Op:      "read API key URL",
-			Err:     err,
-			Message: "failed to read API key URL from input",
-		}
+		return errors.NewValidationError("failed to read API key URL from input", err.Error())
 	}
 
 	url = strings.TrimSpace(url)
@@ -304,7 +275,7 @@ func promptAndSaveAPIKey(reader *bufio.Reader) error {
 func addAPIKey(title, key, url string) error {
 	keys, err := apiKeyRepo.GetAll()
 	if err != nil {
-		return err
+		return errors.NewStorageError("utils.go", "failed to add API key", err)
 	}
 	active := len(keys) == 0
 	newKey := types.APIKey{Title: title, Key: key, URL: url, Active: active}
@@ -315,7 +286,7 @@ func addAPIKey(title, key, url string) error {
 func setKeyActiveByTitle(title string) error {
 	keys, err := apiKeyRepo.GetAll()
 	if err != nil {
-		return err
+		return errors.NewStorageError("utils.go", "failed to set key active by title", err)
 	}
 	found := false
 	for i := range keys {
@@ -327,7 +298,7 @@ func setKeyActiveByTitle(title string) error {
 		}
 	}
 	if !found {
-		return fmt.Errorf("API key with title '%s' not found", title)
+		return errors.NewConfigurationError("utils.go", fmt.Sprintf("API key with title '%s' not found", title))
 	}
 	return apiKeyRepo.SaveAll(keys)
 }
@@ -336,3 +307,8 @@ func setKeyActiveByTitle(title string) error {
 func setActiveAPIKey(title string) error {
 	return apiKeyRepo.SetActive(title)
 }
+
+// STUBS for missing model file helpers
+func modelsFilePath() string      { return ".util/models.json" }
+func initializeModelsFile() error { return nil }
+

@@ -1,3 +1,4 @@
+package cache
 // Package cache provides monitoring and statistics for the caching system.
 package cache
 
@@ -233,3 +234,4 @@ func (cm *CacheMonitor) GetCacheEfficiency() float64 {
 
 	return float64(totalHits) / float64(total) * 100
 }
+

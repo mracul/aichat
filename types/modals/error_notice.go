@@ -1,3 +1,4 @@
+package modals
 // error_notice.go - Modal for displaying a centered error message with a single OK confirmation
 // Used as a flow or standalone modal after an error in another flow
 
@@ -62,3 +63,4 @@ func (m *ErrorNoticeModal) View() string {
 // })
 //
 // In your menu/modal manager, ensure OnConfirm navigates to the main menu after error acknowledgment.
+

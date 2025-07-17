@@ -1,10 +1,12 @@
+package dialogs
 // menu.go - Contains MenuModal for displaying a menu with selectable options in a modal dialog in the Bubble Tea UI.
 
 package dialogs
 
 import (
+	"aichat/components/modals"
+
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // MenuModal is a reusable modal for displaying a menu with options.
@@ -14,13 +16,10 @@ type MenuModal struct {
 	Selected     int
 	OnSelect     func(index int)
 	CloseSelf    func()
-	RegionWidth  int // Last-known or intended region width for rendering
-	RegionHeight int // Last-known or intended region height for rendering
-	// [MIGRATION] Use RenderStrategy and Theme for all rendering in MenuModal.
-	// Replace direct lipgloss.NewStyle() and hardcoded colors with ApplyStrategy and ThemeMap lookups.
-	// Add a ThemeMap field to MenuModal and use it in ViewRegion().
-	ThemeMap       map[string]lipgloss.Style
-	RenderStrategy func(string, int, int) string
+	RegionWidth  int                      // Last-known or intended region width for rendering
+	RegionHeight int                      // Last-known or intended region height for rendering
+	Config       modals.ModalRenderConfig // Use ModalRenderConfig for theming/strategy
+	modals.BaseModal
 }
 
 // Init initializes the modal (Bubble Tea compatibility).
@@ -69,16 +68,15 @@ func (m *MenuModal) View() string {
 
 // ViewRegion renders the menu modal UI as a string, centered in the given region (width, height).
 func (m *MenuModal) ViewRegion(regionWidth, regionHeight int) string {
-	title := m.ThemeMap["title"].Render(m.Title)
 	var opts string
 	for i, opt := range m.Options {
-		style := m.ThemeMap["option"]
+		key := "option"
 		if i == m.Selected {
-			// Instead of Foreground/Background expecting TerminalColor, use a color constant or skip
-			style = style.Bold(true)
+			key = "optionSelected"
 		}
-		opts += style.Render(opt) + "\n"
+		opts += m.Config.RenderContentWithStrategy(opt, key) + "\n"
 	}
-	content := title + "\n\n" + opts
-	return m.RenderStrategy(content, regionWidth, regionHeight)
+	content := m.Title + "\n\n" + opts
+	return m.Config.RenderContentWithStrategy(content, "modalBox")
 }
+

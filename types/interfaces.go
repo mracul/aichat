@@ -1,7 +1,12 @@
 package types
+package types
+
+import (
+	"aichat/interfaces"
+)
 
 // ViewType is an enum for different view state types.
-type ViewType int
+type ViewType = interfaces.ViewType
 
 const (
 	MenuStateType ViewType = iota
@@ -12,22 +17,37 @@ const (
 // ViewState interface is defined in view_state.go
 // This file contains other interfaces and types
 
-// Controller interface for navigation stack and modal management
-// (Moved from src/navigation/interfaces.go to break import cycles)
-type Controller interface {
+// Observer pattern interfaces
+// Observer receives notifications of state changes
+type Observer interface {
+	Notify(event interface{})
+}
+
+// Subject manages observers and notifies them
+type Subject interface {
+	RegisterObserver(o Observer)
+	UnregisterObserver(o Observer)
+	NotifyObservers(event interface{})
+}
+
+// Command pattern interface
+// Command encapsulates an action/event
+type Command interface {
+	Execute(ctx Context, nav interfaces.Controller) error
+}
+
+// NavigationController defines navigation stack methods
+type NavigationController interface {
 	Push(view ViewState)
 	Pop() ViewState
 	Replace(view ViewState)
-	ShowModal(modalType ModalType, data interface{})
-	HideModal()
 	Current() ViewState
 	CanPop() bool
 }
 
-type Context interface {
-	App() interface{}     // *UnifiedAppModel, avoid import cycle
-	GUI() interface{}     // *GUIAppModel, avoid import cycle
-	Storage() interface{} // NavigationStorage, avoid import cycle
-	Config() interface{}  // *AppConfig, avoid import cycle
-	Logger() interface{}  // *slog.Logger, avoid import cycle
+// ModalController defines modal management
+type ModalController interface {
+	ShowModal(modalType ModalType, data interface{})
+	HideModal()
 }
+

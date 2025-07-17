@@ -1,4 +1,5 @@
 package repositories
+package repositories
 
 import (
 	"encoding/json"
@@ -79,3 +80,4 @@ func (r *ChatRepository) GetByTitle(title string) (*types.ChatFile, error) {
 	}
 	return nil, os.ErrNotExist
 }
+

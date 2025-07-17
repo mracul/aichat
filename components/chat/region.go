@@ -1,3 +1,4 @@
+package chat
 // region.go
 // Defines RegionType and region order for CompositeChatViewState
 
@@ -37,3 +38,4 @@ func (r RegionType) String() string {
 		return "UnknownRegion"
 	}
 }
+
