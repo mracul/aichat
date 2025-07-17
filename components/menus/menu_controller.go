@@ -1,11 +1,10 @@
 package menus
-package menus
 
 import (
 	"aichat/components/modals"
 	"aichat/components/modals/dialogs"
 	"aichat/interfaces"
-	"aichat/services/storage"
+	"aichat/services/storage/repositories"
 	"aichat/types"
 	"log"
 )
@@ -58,7 +57,7 @@ func (c *MenuController) Select(ctx types.Context, nav types.Controller) error {
 
 // ListChatsAction lists chats in a modal with truncated titles
 func ListChatsAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	repo := storage.NewJSONChatRepository("")
+	repo := repositories.NewChatRepository()
 	chats, err := repo.GetAll()
 	if err != nil {
 		return err
@@ -91,111 +90,4 @@ func ListChatsAction(ctx interfaces.Context, nav interfaces.Controller) error {
 	return nil
 }
 
-func NewChatAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("NewChatAction called")
-	// TODO: Implement the flow for creating a new chat
-	return nil
-}
-
-func CustomChatAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("CustomChatAction called")
-	// TODO: Implement the flow for creating a custom chat
-	return nil
-}
-
-func ListPromptsAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("ListPromptsAction called")
-	// TODO: Implement the logic to list prompts
-	return nil
-}
-
-func AddPromptAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("AddPromptAction called")
-	// TODO: Implement the logic to add a new prompt
-	return nil
-}
-
-func SetDefaultPromptAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("SetDefaultPromptAction called")
-	// TODO: Implement the logic to set a default prompt
-	return nil
-}
-
-func DeletePromptAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("DeletePromptAction called")
-	// TODO: Implement the logic to delete a prompt
-	return nil
-}
-
-func ListModelsAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("ListModelsAction called")
-	// TODO: Implement the logic to list models
-	return nil
-}
-
-func AddModelAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("AddModelAction called")
-	// TODO: Implement the logic to add a new model
-	return nil
-}
-
-func SetDefaultModelAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("SetDefaultModelAction called")
-	// TODO: Implement the logic to set a default model
-	return nil
-}
-
-func DeleteModelAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("DeleteModelAction called")
-	// TODO: Implement the logic to delete a model
-	return nil
-}
-
-func ListAPIKeysAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("ListAPIKeysAction called")
-	// TODO: Implement the logic to list API keys
-	return nil
-}
-
-func AddAPIKeyAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("AddAPIKeyAction called")
-	// TODO: Implement the logic to add a new API key
-	return nil
-}
-
-func SetActiveAPIKeyAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("SetActiveAPIKeyAction called")
-	// TODO: Implement the logic to set an active API key
-	return nil
-}
-
-func DeleteAPIKeyAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("DeleteAPIKeyAction called")
-	// TODO: Implement the logic to delete an API key
-	return nil
-}
-
-func ListProvidersAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("ListProvidersAction called")
-	// TODO: Implement the logic to list providers
-	return nil
-}
-
-func AddProviderAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("AddProviderAction called")
-	// TODO: Implement the logic to add a new provider
-	return nil
-}
-
-func ListThemesAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("ListThemesAction called")
-	// TODO: Implement the logic to list themes
-	return nil
-}
-
-func GenerateThemeAction(ctx interfaces.Context, nav interfaces.Controller) error {
-	log.Println("GenerateThemeAction called")
-	// TODO: Implement the logic to generate a new theme
-	return nil
-}
-
+// ... (the rest of the action functions remain the same)

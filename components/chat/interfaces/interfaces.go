@@ -1,5 +1,4 @@
 package interfaces
-package interfaces
 
 type IChatView interface {
 	Render(model interface{}) string // Use models.IChatModel in concrete types
@@ -10,4 +9,3 @@ type IChatController interface {
 	SetView(view IChatView)
 	SetModel(model interface{}) // Use models.IChatModel in concrete types
 }
-

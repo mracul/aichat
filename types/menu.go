@@ -1,5 +1,4 @@
 package types
-package types
 
 import (
 	"aichat/interfaces"
@@ -33,4 +32,3 @@ type MenuEntry struct {
 }
 
 type MenuEntrySet []MenuEntry
-
