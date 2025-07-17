@@ -1,5 +1,4 @@
-package main
-package aichat
+package types
 
 import (
 	"aichat/interfaces"
@@ -50,4 +49,3 @@ type ModalController interface {
 	ShowModal(modalType ModalType, data interface{})
 	HideModal()
 }
-
